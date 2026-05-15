@@ -1,6 +1,6 @@
 import { GlassCard, PageHeader } from "./shared";
-import { Wallet, Smartphone, Building2 } from "lucide-react";
-import { useState } from "react";
+import { Wallet, Smartphone, Building2, CheckCircle2, Loader2 } from "lucide-react";
+import { useState, useEffect } from "react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,6 +10,8 @@ import { useAuth } from "@/lib/auth-context";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { lookupWallet, transferToWallet } from "@/lib/transactions.functions";
 
 export function SendMoneyPage() {
   return (
