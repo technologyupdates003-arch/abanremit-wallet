@@ -82,6 +82,24 @@ export type Database = {
           },
         ]
       }
+      idempotency_keys: {
+        Row: {
+          created_at: string
+          key: string
+          scope: string
+        }
+        Insert: {
+          created_at?: string
+          key: string
+          scope: string
+        }
+        Update: {
+          created_at?: string
+          key?: string
+          scope?: string
+        }
+        Relationships: []
+      }
       kyc_documents: {
         Row: {
           back_path: string | null
@@ -241,6 +259,75 @@ export type Database = {
         }
         Relationships: []
       }
+      payment_transactions: {
+        Row: {
+          amount: number
+          authorization_code: string | null
+          brand: string | null
+          channel: string | null
+          created_at: string
+          currency: Database["public"]["Enums"]["wallet_currency"]
+          customer_code: string | null
+          failure_reason: string | null
+          gateway: string
+          gateway_reference: string | null
+          id: string
+          ip_address: string | null
+          last4: string | null
+          metadata: Json
+          paid_at: string | null
+          reference: string
+          status: Database["public"]["Enums"]["tx_status"]
+          updated_at: string
+          user_id: string
+          wallet_id: string | null
+        }
+        Insert: {
+          amount: number
+          authorization_code?: string | null
+          brand?: string | null
+          channel?: string | null
+          created_at?: string
+          currency: Database["public"]["Enums"]["wallet_currency"]
+          customer_code?: string | null
+          failure_reason?: string | null
+          gateway?: string
+          gateway_reference?: string | null
+          id?: string
+          ip_address?: string | null
+          last4?: string | null
+          metadata?: Json
+          paid_at?: string | null
+          reference: string
+          status?: Database["public"]["Enums"]["tx_status"]
+          updated_at?: string
+          user_id: string
+          wallet_id?: string | null
+        }
+        Update: {
+          amount?: number
+          authorization_code?: string | null
+          brand?: string | null
+          channel?: string | null
+          created_at?: string
+          currency?: Database["public"]["Enums"]["wallet_currency"]
+          customer_code?: string | null
+          failure_reason?: string | null
+          gateway?: string
+          gateway_reference?: string | null
+          id?: string
+          ip_address?: string | null
+          last4?: string | null
+          metadata?: Json
+          paid_at?: string | null
+          reference?: string
+          status?: Database["public"]["Enums"]["tx_status"]
+          updated_at?: string
+          user_id?: string
+          wallet_id?: string | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           address: string | null
@@ -295,6 +382,57 @@ export type Database = {
         }
         Relationships: []
       }
+      saved_cards: {
+        Row: {
+          authorization_code: string
+          bank: string | null
+          brand: string
+          country_code: string | null
+          created_at: string
+          customer_code: string | null
+          exp_month: string | null
+          exp_year: string | null
+          id: string
+          is_default: boolean
+          last4: string
+          reusable: boolean
+          signature: string | null
+          user_id: string
+        }
+        Insert: {
+          authorization_code: string
+          bank?: string | null
+          brand: string
+          country_code?: string | null
+          created_at?: string
+          customer_code?: string | null
+          exp_month?: string | null
+          exp_year?: string | null
+          id?: string
+          is_default?: boolean
+          last4: string
+          reusable?: boolean
+          signature?: string | null
+          user_id: string
+        }
+        Update: {
+          authorization_code?: string
+          bank?: string | null
+          brand?: string
+          country_code?: string | null
+          created_at?: string
+          customer_code?: string | null
+          exp_month?: string | null
+          exp_year?: string | null
+          id?: string
+          is_default?: boolean
+          last4?: string
+          reusable?: boolean
+          signature?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       security_logs: {
         Row: {
           created_at: string
@@ -342,6 +480,65 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      wallet_ledger: {
+        Row: {
+          amount: number
+          balance_after: number
+          balance_before: number
+          created_at: string
+          currency: Database["public"]["Enums"]["wallet_currency"]
+          description: string | null
+          direction: string
+          id: string
+          metadata: Json
+          payment_transaction_id: string | null
+          transaction_id: string | null
+          type: string
+          user_id: string
+          wallet_id: string
+        }
+        Insert: {
+          amount: number
+          balance_after: number
+          balance_before: number
+          created_at?: string
+          currency: Database["public"]["Enums"]["wallet_currency"]
+          description?: string | null
+          direction: string
+          id?: string
+          metadata?: Json
+          payment_transaction_id?: string | null
+          transaction_id?: string | null
+          type: string
+          user_id: string
+          wallet_id: string
+        }
+        Update: {
+          amount?: number
+          balance_after?: number
+          balance_before?: number
+          created_at?: string
+          currency?: Database["public"]["Enums"]["wallet_currency"]
+          description?: string | null
+          direction?: string
+          id?: string
+          metadata?: Json
+          payment_transaction_id?: string | null
+          transaction_id?: string | null
+          type?: string
+          user_id?: string
+          wallet_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wallet_ledger_payment_transaction_id_fkey"
+            columns: ["payment_transaction_id"]
+            isOneToOne: false
+            referencedRelation: "payment_transactions"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       wallet_transactions: {
         Row: {
@@ -488,6 +685,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      credit_wallet_from_payment: {
+        Args: {
+          _authorization: Json
+          _gateway_reference: string
+          _payment_id: string
+        }
+        Returns: number
+      }
       gen_wallet_number: {
         Args: { _currency: Database["public"]["Enums"]["wallet_currency"] }
         Returns: string
