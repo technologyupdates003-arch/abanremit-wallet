@@ -35,6 +35,42 @@ export type Database = {
         }
         Relationships: []
       }
+      audit_logs: {
+        Row: {
+          action: string
+          created_at: string
+          entity: string | null
+          entity_id: string | null
+          id: string
+          ip: string | null
+          metadata: Json
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          entity?: string | null
+          entity_id?: string | null
+          id?: string
+          ip?: string | null
+          metadata?: Json
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          entity?: string | null
+          entity_id?: string | null
+          id?: string
+          ip?: string | null
+          metadata?: Json
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       deposits: {
         Row: {
           amount: number
@@ -81,6 +117,30 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      exchange_rates: {
+        Row: {
+          from_currency: Database["public"]["Enums"]["wallet_currency"]
+          rate: number
+          spread: number
+          to_currency: Database["public"]["Enums"]["wallet_currency"]
+          updated_at: string
+        }
+        Insert: {
+          from_currency: Database["public"]["Enums"]["wallet_currency"]
+          rate: number
+          spread?: number
+          to_currency: Database["public"]["Enums"]["wallet_currency"]
+          updated_at?: string
+        }
+        Update: {
+          from_currency?: Database["public"]["Enums"]["wallet_currency"]
+          rate?: number
+          spread?: number
+          to_currency?: Database["public"]["Enums"]["wallet_currency"]
+          updated_at?: string
+        }
+        Relationships: []
       }
       idempotency_keys: {
         Row: {
@@ -511,6 +571,138 @@ export type Database = {
         }
         Relationships: []
       }
+      transaction_status_history: {
+        Row: {
+          actor: string | null
+          created_at: string
+          from_status: Database["public"]["Enums"]["tx_status"] | null
+          id: string
+          reason: string | null
+          to_status: Database["public"]["Enums"]["tx_status"]
+          transaction_id: string
+        }
+        Insert: {
+          actor?: string | null
+          created_at?: string
+          from_status?: Database["public"]["Enums"]["tx_status"] | null
+          id?: string
+          reason?: string | null
+          to_status: Database["public"]["Enums"]["tx_status"]
+          transaction_id: string
+        }
+        Update: {
+          actor?: string | null
+          created_at?: string
+          from_status?: Database["public"]["Enums"]["tx_status"] | null
+          id?: string
+          reason?: string | null
+          to_status?: Database["public"]["Enums"]["tx_status"]
+          transaction_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transaction_status_history_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      transactions: {
+        Row: {
+          amount: number
+          counterparty_user_id: string | null
+          created_at: string
+          destination_amount: number | null
+          destination_currency:
+            | Database["public"]["Enums"]["wallet_currency"]
+            | null
+          exchange_rate: number | null
+          failure_reason: string | null
+          fee: number
+          gateway: string | null
+          gateway_reference: string | null
+          id: string
+          idempotency_key: string | null
+          ip_address: string | null
+          metadata: Json
+          narration: string | null
+          processed_at: string | null
+          receiver_wallet_id: string | null
+          reference: string
+          sender_wallet_id: string | null
+          source_currency: Database["public"]["Enums"]["wallet_currency"] | null
+          status: Database["public"]["Enums"]["tx_status"]
+          type: Database["public"]["Enums"]["tx_master_type"]
+          updated_at: string
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          counterparty_user_id?: string | null
+          created_at?: string
+          destination_amount?: number | null
+          destination_currency?:
+            | Database["public"]["Enums"]["wallet_currency"]
+            | null
+          exchange_rate?: number | null
+          failure_reason?: string | null
+          fee?: number
+          gateway?: string | null
+          gateway_reference?: string | null
+          id?: string
+          idempotency_key?: string | null
+          ip_address?: string | null
+          metadata?: Json
+          narration?: string | null
+          processed_at?: string | null
+          receiver_wallet_id?: string | null
+          reference: string
+          sender_wallet_id?: string | null
+          source_currency?:
+            | Database["public"]["Enums"]["wallet_currency"]
+            | null
+          status?: Database["public"]["Enums"]["tx_status"]
+          type: Database["public"]["Enums"]["tx_master_type"]
+          updated_at?: string
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          counterparty_user_id?: string | null
+          created_at?: string
+          destination_amount?: number | null
+          destination_currency?:
+            | Database["public"]["Enums"]["wallet_currency"]
+            | null
+          exchange_rate?: number | null
+          failure_reason?: string | null
+          fee?: number
+          gateway?: string | null
+          gateway_reference?: string | null
+          id?: string
+          idempotency_key?: string | null
+          ip_address?: string | null
+          metadata?: Json
+          narration?: string | null
+          processed_at?: string | null
+          receiver_wallet_id?: string | null
+          reference?: string
+          sender_wallet_id?: string | null
+          source_currency?:
+            | Database["public"]["Enums"]["wallet_currency"]
+            | null
+          status?: Database["public"]["Enums"]["tx_status"]
+          type?: Database["public"]["Enums"]["tx_master_type"]
+          updated_at?: string
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           id: string
@@ -541,6 +733,7 @@ export type Database = {
           id: string
           metadata: Json
           payment_transaction_id: string | null
+          reference: string | null
           transaction_id: string | null
           type: string
           user_id: string
@@ -557,6 +750,7 @@ export type Database = {
           id?: string
           metadata?: Json
           payment_transaction_id?: string | null
+          reference?: string | null
           transaction_id?: string | null
           type: string
           user_id: string
@@ -573,6 +767,7 @@ export type Database = {
           id?: string
           metadata?: Json
           payment_transaction_id?: string | null
+          reference?: string | null
           transaction_id?: string | null
           type?: string
           user_id?: string
@@ -653,29 +848,38 @@ export type Database = {
       }
       wallets: {
         Row: {
+          available_balance: number | null
           balance: number
           created_at: string
           currency: Database["public"]["Enums"]["wallet_currency"]
           id: string
           is_primary: boolean
+          locked_balance: number
+          status: Database["public"]["Enums"]["wallet_status"]
           user_id: string
           wallet_number: string
         }
         Insert: {
+          available_balance?: number | null
           balance?: number
           created_at?: string
           currency: Database["public"]["Enums"]["wallet_currency"]
           id?: string
           is_primary?: boolean
+          locked_balance?: number
+          status?: Database["public"]["Enums"]["wallet_status"]
           user_id: string
           wallet_number: string
         }
         Update: {
+          available_balance?: number | null
           balance?: number
           created_at?: string
           currency?: Database["public"]["Enums"]["wallet_currency"]
           id?: string
           is_primary?: boolean
+          locked_balance?: number
+          status?: Database["public"]["Enums"]["wallet_status"]
           user_id?: string
           wallet_number?: string
         }
@@ -831,17 +1035,74 @@ export type Database = {
         }
         Returns: number
       }
+      lookup_wallet_by_number: {
+        Args: { _wallet_number: string }
+        Returns: {
+          currency: Database["public"]["Enums"]["wallet_currency"]
+          full_name: string
+          status: Database["public"]["Enums"]["wallet_status"]
+          wallet_id: string
+          wallet_user_id: string
+        }[]
+      }
       reverse_withdrawal: {
         Args: { _reason: string; _withdrawal_id: string }
         Returns: undefined
       }
       set_transaction_pin: { Args: { _pin: string }; Returns: undefined }
+      tx_convert_currency: {
+        Args: {
+          _amount: number
+          _from_wallet_id: string
+          _idempotency_key: string
+          _ip: string
+          _pin: string
+          _to_wallet_id: string
+          _user_agent: string
+        }
+        Returns: Json
+      }
+      tx_execute_transfer: {
+        Args: {
+          _amount: number
+          _from_wallet_id: string
+          _idempotency_key: string
+          _ip: string
+          _narration: string
+          _pin: string
+          _to_wallet_number: string
+          _user_agent: string
+        }
+        Returns: Json
+      }
       verify_transaction_pin: { Args: { _pin: string }; Returns: boolean }
     }
     Enums: {
       app_role: "admin" | "user"
       kyc_doc_type: "national_id" | "passport" | "drivers_license"
       kyc_status: "not_submitted" | "pending" | "approved" | "rejected"
+      ledger_entry_type:
+        | "debit_lock"
+        | "lock_release"
+        | "debit_settle"
+        | "credit"
+        | "fee"
+        | "fx_in"
+        | "fx_out"
+        | "reversal"
+      tx_master_type:
+        | "wallet_to_wallet"
+        | "wallet_to_bank"
+        | "bank_to_wallet"
+        | "card_funding"
+        | "mpesa_funding"
+        | "currency_conversion"
+        | "withdrawal"
+        | "deposit"
+        | "internal_transfer"
+        | "aban_coin_trade"
+        | "refund"
+        | "reversal"
       tx_status:
         | "pending"
         | "completed"
@@ -850,6 +1111,8 @@ export type Database = {
         | "queued"
         | "processing"
         | "cancelled"
+        | "locked"
+        | "successful"
       tx_type:
         | "deposit"
         | "withdrawal"
@@ -860,6 +1123,7 @@ export type Database = {
         | "aban_buy"
         | "aban_sell"
       wallet_currency: "KES" | "USD" | "EUR" | "GBP" | "BTC" | "ABAN"
+      wallet_status: "active" | "frozen" | "closed"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -990,6 +1254,30 @@ export const Constants = {
       app_role: ["admin", "user"],
       kyc_doc_type: ["national_id", "passport", "drivers_license"],
       kyc_status: ["not_submitted", "pending", "approved", "rejected"],
+      ledger_entry_type: [
+        "debit_lock",
+        "lock_release",
+        "debit_settle",
+        "credit",
+        "fee",
+        "fx_in",
+        "fx_out",
+        "reversal",
+      ],
+      tx_master_type: [
+        "wallet_to_wallet",
+        "wallet_to_bank",
+        "bank_to_wallet",
+        "card_funding",
+        "mpesa_funding",
+        "currency_conversion",
+        "withdrawal",
+        "deposit",
+        "internal_transfer",
+        "aban_coin_trade",
+        "refund",
+        "reversal",
+      ],
       tx_status: [
         "pending",
         "completed",
@@ -998,6 +1286,8 @@ export const Constants = {
         "queued",
         "processing",
         "cancelled",
+        "locked",
+        "successful",
       ],
       tx_type: [
         "deposit",
@@ -1010,6 +1300,7 @@ export const Constants = {
         "aban_sell",
       ],
       wallet_currency: ["KES", "USD", "EUR", "GBP", "BTC", "ABAN"],
+      wallet_status: ["active", "frozen", "closed"],
     },
   },
 } as const
