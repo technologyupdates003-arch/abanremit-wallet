@@ -1,141 +1,90 @@
-# AbanRemit Transaction Engine
+# Continue Transaction Engine + Begin Super Admin Control Center
 
-A banking-grade transaction core that becomes the **single source of truth** for every wallet movement in the app. All existing flows (card funding via Paystack, bank withdrawals via Paystack Transfer) get re-routed through it; new flows (wallet-to-wallet, internal FX) are added on top.
+## Part A — Finish Transaction Engine (this turn)
 
-## Guiding principles
+1. **Convert page** (`src/routes/_app/convert.tsx` + `src/components/app/ConvertPage.tsx`)
+   - Source/destination wallet selectors (own wallets only, different currencies)
+   - Live rate preview via `getExchangeRate` server fn (debounced)
+   - Amount input with destination preview (`amount × effective_rate`)
+   - PIN step → calls `convertCurrency` with idempotency key
+   - Success receipt with rate, source/destination amounts, reference
+   - Realtime balance refresh on success
 
-- **Ledger is truth.** `balance` on `wallets` is a cached projection; every change is backed by an immutable `ledger_entries` row.
-- **Atomic.** Every state change happens inside a single Postgres function with `FOR UPDATE` row locks — no multi-statement client orchestration.
-- **Locked vs available.** `wallets.locked_balance` is added; `available = balance - locked_balance`. All preflight checks use available.
-- **Idempotent.** Every external-facing mutation requires a client-supplied `idempotency_key`; replays return the original result.
-- **Immutable history.** Reversals create new compensating entries — never `UPDATE`/`DELETE` on the ledger.
+2. **Realtime wallet hook** (`src/hooks/useWalletRealtime.ts`)
+   - Subscribes to `wallets`, `transactions`, `wallet_ledger` postgres_changes for current user
+   - Invalidates relevant React Query keys
+   - Mount once at app shell (`_app` layout) so all pages get live updates
+   - Enable realtime on `wallets`, `transactions`, `wallet_ledger`, `notifications` via migration
 
----
+3. **Webhook refactor** (`src/routes/api/public/paystack-webhook.ts`)
+   - For `charge.success`: write a `transactions` row (type=`card_funding`, status=`successful`) alongside existing `credit_wallet_from_payment` flow
+   - For `transfer.success/failed/reversed`: also insert `transaction_status_history` row tied to the withdrawal's transaction (create `transactions` row when withdrawal is initiated if not already)
+   - Keep existing `finalize_withdrawal` / `reverse_withdrawal` calls (already atomic)
+   - Idempotent on `withdrawal_webhooks` table
 
-## Phase 1 — Schema (single migration)
+4. **Send page polish**: add link to Convert when currency mismatch detected (already wired to error — turn it into a CTA).
 
-**Extend `wallets`:**
-- `locked_balance numeric not null default 0`
-- `status wallet_status not null default 'active'` (`active|frozen|closed`)
-- generated column `available_balance` = `balance - locked_balance`
-- CHECK `balance >= 0`, `locked_balance >= 0`, `locked_balance <= balance`
+## Part B — Super Admin Control Center (foundation, this turn)
 
-**New `transactions` (master orchestrator table):**
-`id, reference (unique), idempotency_key (unique), user_id, type (tx_type enum), status (tx_status — extend with queued/locked/processing/successful/reversed), sender_wallet_id, receiver_wallet_id, amount, fee, source_currency, destination_currency, exchange_rate, gateway, gateway_reference, narration, metadata jsonb, ip, user_agent, processed_at, created_at, updated_at`
+Scope realistically: deliver a production-grade **foundation** with the highest-value modules wired end-to-end. Defer leaf modules (AbanCoin market controls, IntaSend, support desk, system settings UI) to follow-ups — they get DB-ready scaffolding only.
 
-**Extend `wallet_ledger` → rename concept to `ledger_entries`** (keep table name `wallet_ledger` for back-compat, add columns):
-- `transaction_id uuid` (FK to transactions)
-- `entry_type` (`debit_lock | debit_settle | credit | fee | fx_in | fx_out | reversal`)
-- `reference text`
-- index on `(transaction_id)`, `(wallet_id, created_at desc)`
+### B1. RBAC + admin guard (migration)
+- Extend `app_role` enum: add `super_admin`, `finance_admin`, `support_admin`, `compliance_admin`, `fraud_admin`, `operations_admin`
+- New helper RPC `is_admin(uid)` → true for any non-`user` role
+- New helper RPC `has_admin_role(uid, role)` for granular checks
+- New `admin_audit_logs` table (admin_id, action, entity, entity_id, metadata, ip, user_agent, created_at) — RLS: admins read, inserts via SECURITY DEFINER only
+- New TanStack server middleware `requireAdmin` (reuses `requireSupabaseAuth`, then checks `is_admin`)
+- Route guard `_admin/route.tsx` → `beforeLoad` calls a `getAdminContext` server fn, redirects to `/` if not admin
+- First admin bootstrap: SQL function `bootstrap_first_admin(email)` callable once; document for the user
 
-**New `transaction_status_history`:** append-only audit of state transitions (`transaction_id, from_status, to_status, reason, actor, created_at`).
+### B2. Admin server functions (`src/lib/admin.functions.ts`)
+All `.middleware([requireAdmin])`, all log to `admin_audit_logs`:
+- `adminListUsers({ search, page, kyc_status, status })` — paginated profiles + roles + wallet totals
+- `adminGetUser(userId)` — full profile, wallets, devices, recent tx, kyc docs (signed URLs), pin_attempts, audit
+- `adminFreezeWallet(walletId, reason)` / `adminUnfreezeWallet(walletId)` — sets `wallets.status`
+- `adminAdjustBalance(walletId, amount, direction, reason)` — atomic via new RPC `tx_admin_adjust` (creates `transactions` row type=`admin_adjustment`, ledger entry, audit log)
+- `adminApproveKyc(userId, tier)` / `adminRejectKyc(userId, reason)` — updates profile + kyc_documents
+- `adminListTransactions({ filters, cursor })` — server-side pagination with all filters from prompt
+- `adminListWithdrawals({ status })` / `adminApproveWithdrawal(id)` / `adminRejectWithdrawal(id, reason)` — calls existing `reverse_withdrawal` for rejects
+- `adminSetExchangeRate(from, to, rate, spread)` — upsert into `exchange_rates`
+- `adminReplayWebhook(webhookId)` — re-runs webhook handler logic for stuck rows
+- `adminDashboardStats()` — single fn returning all KPI counters
 
-**New `exchange_rates`:** `from_currency, to_currency, rate, spread, updated_at` (PK on pair). Seed KES↔USD, KES↔ABAN, USD↔ABAN.
+### B3. Admin UI shell (`src/routes/_app/admin/`)
+Coal-black + matte-glass + red-accent theme (introduce `--admin-bg`, `--admin-surface`, `--admin-accent` tokens scoped under `[data-theme="admin"]` so it doesn't bleed into the rest of the app).
+- `admin/index.tsx` — Dashboard (KPI grid, live tx ticker via realtime, gateway health pings, revenue chart placeholder backed by real `transactions` aggregates)
+- `admin/users.tsx` — searchable, paginated table; row → drawer with full user profile, action buttons (freeze, unfreeze, approve KYC, reset PIN)
+- `admin/transactions.tsx` — full filter bar, virtualized table, row → drawer with ledger entries + status history + reversal action (where allowed)
+- `admin/withdrawals.tsx` — operational queue grouped by status, approve/reject/retry actions
+- `admin/kyc.tsx` — review queue with document viewer (zoomable), approve/reject with notes
+- `admin/wallets.tsx` — search/freeze/adjust UI, with mandatory reason + confirmation modal for adjustments
+- `admin/rates.tsx` — exchange-rate editor with spread, last-updated, history
+- `admin/audit.tsx` — admin audit log viewer (filterable by admin, action, entity, date)
+- `admin/security.tsx` — login attempts, pin lockouts, session revocation (defers external IP block to backlog)
+- Sidebar nav with role-gated items (use `has_admin_role` checks)
+- Realtime: subscribe to `transactions`, `withdrawals`, `kyc_documents` for live counters
 
-**New `audit_logs`:** `user_id, action, entity, entity_id, ip, user_agent, metadata, created_at`. RLS: own-rows read.
+### B4. Realtime publication
+- Single migration adding `wallets`, `transactions`, `wallet_ledger`, `notifications`, `withdrawals`, `kyc_documents`, `audit_logs` to `supabase_realtime` publication
 
-**Extend `idempotency_keys`:** add `response jsonb`, `transaction_id uuid` to cache replay results.
+### B5. Deferred (scaffolded, not built this turn)
+- AbanCoin market control UI (engine logs already exist, build read-only viewer only)
+- IntaSend control center (no IntaSend integration in project yet)
+- Support desk (no tickets schema yet — defer table + UI)
+- System settings UI (DB row exists conceptually only — defer)
+- Per-permission ACL beyond role-level checks
 
-**RLS:** users read own `transactions`, own `audit_logs`, own `ledger_entries`. No client write on any of these — all writes go through SECURITY DEFINER RPCs.
+## Technical notes
 
----
+- All admin mutations go through `SECURITY DEFINER` RPCs that re-verify `is_admin(auth.uid())` server-side — RLS is the backstop, middleware is the gate.
+- `tx_admin_adjust` follows the same atomic pattern as `tx_execute_transfer`: lock wallet `FOR UPDATE`, write `transactions` row, write `wallet_ledger` entry, write `transaction_status_history`, write `admin_audit_logs`.
+- Ledger remains immutable — adjustments create new entries, never UPDATE/DELETE.
+- Admin theme uses scoped CSS variables; existing user-facing theme stays untouched.
+- RBAC checks happen in three layers: route `beforeLoad` (UX), server fn middleware (auth), Postgres RPC (data).
 
-## Phase 2 — Atomic Postgres engine (SECURITY DEFINER functions)
-
-All in one migration, all `SET search_path = public`, all use `FOR UPDATE`.
-
-1. **`tx_lock_funds(_tx_id, _wallet_id, _amount, _fee)`**
-   Locks wallet row, validates `available >= amount+fee`, increments `locked_balance`, writes `debit_lock` ledger row, transitions tx → `locked`.
-
-2. **`tx_settle_transfer(_tx_id)`** (wallet→wallet & FX)
-   Locks both wallet rows in deterministic id order (deadlock prevention), debits sender (decrement balance + locked_balance), credits receiver, writes `debit_settle` + `credit` ledger rows, sets tx → `successful`, inserts notifications both sides, writes audit log.
-
-3. **`tx_settle_external_debit(_tx_id, _gateway_ref)`** (withdrawals/Paystack transfer success)
-   Finalizes a previously-locked debit: decrements balance & locked_balance, writes `debit_settle` ledger row, tx → `successful`. Replaces existing `finalize_withdrawal`.
-
-4. **`tx_credit_external(_tx_id, _gateway_ref)`** (card funding success)
-   Idempotent credit; finds wallet, increments balance, writes `credit` ledger row, tx → `successful`. Replaces existing `credit_wallet_from_payment`.
-
-5. **`tx_reverse(_tx_id, _reason)`**
-   Compensating entries:
-   - If still `locked` → release lock (decrement `locked_balance`), no balance change.
-   - If `successful` debit → credit back, write `reversal` ledger entry.
-   - Tx → `reversed` or `failed`. Always logs status history + notification.
-
-6. **`tx_convert_currency(_tx_id, _from_wallet_id, _to_wallet_id, _amount, _pin)`**
-   Verifies PIN, snapshots rate from `exchange_rates`, locks both wallets, debits source, credits destination at `amount * rate`, stores rate inside tx row, writes paired `fx_out`/`fx_in` ledger entries.
-
-7. **`tx_log_status(...)`**, **`tx_log_audit(...)`** — internal helpers used by all the above.
-
-8. **Trigger `wallets_balance_invariant`** — `BEFORE UPDATE` on `wallets`, raises if `balance < 0` or `locked_balance > balance`.
-
-9. **Reconciliation view `v_wallet_ledger_check`** — sums ledger debits/credits per wallet and flags drift vs `wallets.balance`. Used by admin/cron later.
-
----
-
-## Phase 3 — Server functions (`src/lib/transactions.functions.ts`)
-
-All `createServerFn` + `requireSupabaseAuth`. Zod-validated. Each captures IP/user-agent and writes to `audit_logs`.
-
-- `transferToWallet({ fromWalletId, toWalletNumber, amount, narration, pin, idempotencyKey })` — looks up receiver wallet, creates tx, calls `tx_lock_funds` then `tx_settle_transfer` in one round-trip via a wrapper RPC `tx_execute_transfer`.
-- `convertCurrency({ fromWalletId, toCurrency, amount, pin, idempotencyKey })` — RPC `tx_convert_currency`.
-- `getExchangeRate({ from, to })` — public read of `exchange_rates`.
-- `listTransactions({ filter, cursor })` — paginated, joins ledger.
-- `getTransaction({ id })` — full detail incl. ledger entries + status history.
-
-**Refactor existing flows to use the new engine (no behavior change for users):**
-- `src/routes/api/public/paystack-webhook.ts` — replace calls to `credit_wallet_from_payment` / `finalize_withdrawal` / `reverse_withdrawal` with `tx_credit_external` / `tx_settle_external_debit` / `tx_reverse`. Keep HMAC-SHA512 verify + `idempotency_keys` guard already in place.
-- `src/lib/transfers.functions.ts::initiateWithdrawal` — keep PIN verify + Paystack call, but route the lock through `tx_lock_funds` against the new `transactions` row (instead of `lock_funds_for_withdrawal` against `withdrawals`). Mirror `withdrawals` row stays for UX/history but becomes a projection of the master `transactions` row.
-- `src/lib/paystack.functions.ts::initializeTransaction` — write a `transactions` row (`type=card_funding`, `status=pending`) alongside the existing `payment_transactions` row, so the webhook can resolve it.
-
----
-
-## Phase 4 — Idempotency, fraud, security layer
-
-- All mutating server fns require `idempotencyKey: z.string().uuid()`. Wrapper RPC checks `idempotency_keys` table first; on hit returns cached `response` jsonb.
-- Velocity: per-RPC, count tx in last 60s/24h; soft-limit configurable (5/min, 20/day for transfers default). Block + audit log on breach.
-- PIN: reuse existing `verify_transaction_pin` with 5-attempt → 30-min lockout (already in DB). Required for transfer, convert, withdraw.
-- IP + UA captured via `getRequestIP` / `getRequestHeader` and attached to tx + audit log.
-- Wallet ownership re-validated server-side on every call (RLS + explicit `user_id` check inside RPCs).
-
----
-
-## Phase 5 — UI: Wallet-to-wallet & FX
-
-Two new screens, premium glassmorphism matching existing wizards (`WithdrawPage` style).
-
-- **`SendMoneyPage` rebuild** (`src/components/app/SendMoneyPage.tsx`) — 4-step: source wallet → recipient wallet number (live lookup shows recipient name/currency, currency-match check) → amount + narration → PIN + review. Realtime status via `transactions` subscription + receipt screen.
-- **`ConvertPage` (new)** — source wallet → target currency (dropdown of user's other wallets) → amount with live rate preview + "you receive" → PIN. Route `/_app/convert`. Add nav entry.
-
-**Realtime wiring (shared hook `useWalletRealtime`):** subscribe to `wallets` (own rows) + `transactions` (own rows). Invalidate React Query keys `['wallets']`, `['txs']`, `['tx', id]`. Use in Dashboard, Wallets, Transactions pages.
-
-**Transactions page upgrade:** add status badges for new statuses (`locked`, `processing`, `reversed`), show fee / fx-rate columns when present, expandable row → ledger entries.
-
----
-
-## Phase 6 — Out of scope (explicit)
-
-To keep this shippable in one round; scaffolded but deferred:
-- BullMQ/Redis queue (Cloudflare Worker runtime can't host long-running queues; webhook + pg_cron retries cover the same need for now)
-- Admin panel UI (tables/RPCs are admin-ready; UI later)
-- Device fingerprinting beyond UA
-- Geo-risk scoring
-- Real-time WebSocket layer beyond Supabase Realtime
-- Pulling FX rates from an external feed (rates seeded + admin-updatable; live feed integration later)
-- M-Pesa Daraja, AbanCoin trading engine, virtual cards, merchant payments — engine supports the tx types, surfaces stay "coming soon" until those gateways are integrated
-
-## Tech notes
-
-- All amounts kept as `numeric(20,4)`; subunit conversion happens only at Paystack boundary.
-- Deadlock-safe two-wallet locking: always `SELECT ... FOR UPDATE ORDER BY id`.
-- Generated `available_balance` lets clients read it directly with no extra logic.
-- Reversal of a `successful` external debit only credits back if the gateway confirms reversal — webhook-driven, never client-initiated.
-- `transactions` table becomes the canonical join point; `wallet_transactions`, `withdrawals`, `payment_transactions` continue to exist as type-specific projections backed by `transaction_id` FK (added now, populated going forward).
-
-## Delivery order
-
-1. Migration: schema + RPCs + trigger + seed FX rates.
-2. Server fns + webhook refactor.
-3. UI: SendMoney rebuild, Convert page, realtime hook, route registration.
-4. Transactions page badges/expansion.
+## Out of scope this turn (will state in reply)
+- Email/SMS alert delivery (DB notifications only)
+- AML/sanctions list integration
+- Automated fraud-rule engine (manual review queue only)
+- Bulk CSV exports (defer)
+- Per-role granular permission matrix UI (role-level only)
