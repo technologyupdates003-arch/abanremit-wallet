@@ -24,8 +24,18 @@ import { Route as AppMarketRouteImport } from './routes/_app/market'
 import { Route as AppKycRouteImport } from './routes/_app/kyc'
 import { Route as AppFundRouteImport } from './routes/_app/fund'
 import { Route as AppDashboardRouteImport } from './routes/_app/dashboard'
+import { Route as AppAdminRouteImport } from './routes/_app/admin'
 import { Route as AppAbanRouteImport } from './routes/_app/aban'
+import { Route as AppAdminIndexRouteImport } from './routes/_app/admin/index'
 import { Route as ApiPublicPaystackWebhookRouteImport } from './routes/api/public/paystack-webhook'
+import { Route as AppAdminWithdrawalsRouteImport } from './routes/_app/admin/withdrawals'
+import { Route as AppAdminWalletsRouteImport } from './routes/_app/admin/wallets'
+import { Route as AppAdminUsersRouteImport } from './routes/_app/admin/users'
+import { Route as AppAdminTransactionsRouteImport } from './routes/_app/admin/transactions'
+import { Route as AppAdminSecurityRouteImport } from './routes/_app/admin/security'
+import { Route as AppAdminRatesRouteImport } from './routes/_app/admin/rates'
+import { Route as AppAdminKycRouteImport } from './routes/_app/admin/kyc'
+import { Route as AppAdminAuditRouteImport } from './routes/_app/admin/audit'
 
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
   id: '/reset-password',
@@ -101,10 +111,20 @@ const AppDashboardRoute = AppDashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => AppRouteRoute,
 } as any)
+const AppAdminRoute = AppAdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => AppRouteRoute,
+} as any)
 const AppAbanRoute = AppAbanRouteImport.update({
   id: '/aban',
   path: '/aban',
   getParentRoute: () => AppRouteRoute,
+} as any)
+const AppAdminIndexRoute = AppAdminIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppAdminRoute,
 } as any)
 const ApiPublicPaystackWebhookRoute =
   ApiPublicPaystackWebhookRouteImport.update({
@@ -112,6 +132,46 @@ const ApiPublicPaystackWebhookRoute =
     path: '/api/public/paystack-webhook',
     getParentRoute: () => rootRouteImport,
   } as any)
+const AppAdminWithdrawalsRoute = AppAdminWithdrawalsRouteImport.update({
+  id: '/withdrawals',
+  path: '/withdrawals',
+  getParentRoute: () => AppAdminRoute,
+} as any)
+const AppAdminWalletsRoute = AppAdminWalletsRouteImport.update({
+  id: '/wallets',
+  path: '/wallets',
+  getParentRoute: () => AppAdminRoute,
+} as any)
+const AppAdminUsersRoute = AppAdminUsersRouteImport.update({
+  id: '/users',
+  path: '/users',
+  getParentRoute: () => AppAdminRoute,
+} as any)
+const AppAdminTransactionsRoute = AppAdminTransactionsRouteImport.update({
+  id: '/transactions',
+  path: '/transactions',
+  getParentRoute: () => AppAdminRoute,
+} as any)
+const AppAdminSecurityRoute = AppAdminSecurityRouteImport.update({
+  id: '/security',
+  path: '/security',
+  getParentRoute: () => AppAdminRoute,
+} as any)
+const AppAdminRatesRoute = AppAdminRatesRouteImport.update({
+  id: '/rates',
+  path: '/rates',
+  getParentRoute: () => AppAdminRoute,
+} as any)
+const AppAdminKycRoute = AppAdminKycRouteImport.update({
+  id: '/kyc',
+  path: '/kyc',
+  getParentRoute: () => AppAdminRoute,
+} as any)
+const AppAdminAuditRoute = AppAdminAuditRouteImport.update({
+  id: '/audit',
+  path: '/audit',
+  getParentRoute: () => AppAdminRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -119,6 +179,7 @@ export interface FileRoutesByFullPath {
   '/register': typeof RegisterRoute
   '/reset-password': typeof ResetPasswordRoute
   '/aban': typeof AppAbanRoute
+  '/admin': typeof AppAdminRouteWithChildren
   '/dashboard': typeof AppDashboardRoute
   '/fund': typeof AppFundRoute
   '/kyc': typeof AppKycRoute
@@ -129,7 +190,16 @@ export interface FileRoutesByFullPath {
   '/transactions': typeof AppTransactionsRoute
   '/wallets': typeof AppWalletsRoute
   '/withdraw': typeof AppWithdrawRoute
+  '/admin/audit': typeof AppAdminAuditRoute
+  '/admin/kyc': typeof AppAdminKycRoute
+  '/admin/rates': typeof AppAdminRatesRoute
+  '/admin/security': typeof AppAdminSecurityRoute
+  '/admin/transactions': typeof AppAdminTransactionsRoute
+  '/admin/users': typeof AppAdminUsersRoute
+  '/admin/wallets': typeof AppAdminWalletsRoute
+  '/admin/withdrawals': typeof AppAdminWithdrawalsRoute
   '/api/public/paystack-webhook': typeof ApiPublicPaystackWebhookRoute
+  '/admin/': typeof AppAdminIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -147,7 +217,16 @@ export interface FileRoutesByTo {
   '/transactions': typeof AppTransactionsRoute
   '/wallets': typeof AppWalletsRoute
   '/withdraw': typeof AppWithdrawRoute
+  '/admin/audit': typeof AppAdminAuditRoute
+  '/admin/kyc': typeof AppAdminKycRoute
+  '/admin/rates': typeof AppAdminRatesRoute
+  '/admin/security': typeof AppAdminSecurityRoute
+  '/admin/transactions': typeof AppAdminTransactionsRoute
+  '/admin/users': typeof AppAdminUsersRoute
+  '/admin/wallets': typeof AppAdminWalletsRoute
+  '/admin/withdrawals': typeof AppAdminWithdrawalsRoute
   '/api/public/paystack-webhook': typeof ApiPublicPaystackWebhookRoute
+  '/admin': typeof AppAdminIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -157,6 +236,7 @@ export interface FileRoutesById {
   '/register': typeof RegisterRoute
   '/reset-password': typeof ResetPasswordRoute
   '/_app/aban': typeof AppAbanRoute
+  '/_app/admin': typeof AppAdminRouteWithChildren
   '/_app/dashboard': typeof AppDashboardRoute
   '/_app/fund': typeof AppFundRoute
   '/_app/kyc': typeof AppKycRoute
@@ -167,7 +247,16 @@ export interface FileRoutesById {
   '/_app/transactions': typeof AppTransactionsRoute
   '/_app/wallets': typeof AppWalletsRoute
   '/_app/withdraw': typeof AppWithdrawRoute
+  '/_app/admin/audit': typeof AppAdminAuditRoute
+  '/_app/admin/kyc': typeof AppAdminKycRoute
+  '/_app/admin/rates': typeof AppAdminRatesRoute
+  '/_app/admin/security': typeof AppAdminSecurityRoute
+  '/_app/admin/transactions': typeof AppAdminTransactionsRoute
+  '/_app/admin/users': typeof AppAdminUsersRoute
+  '/_app/admin/wallets': typeof AppAdminWalletsRoute
+  '/_app/admin/withdrawals': typeof AppAdminWithdrawalsRoute
   '/api/public/paystack-webhook': typeof ApiPublicPaystackWebhookRoute
+  '/_app/admin/': typeof AppAdminIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -177,6 +266,7 @@ export interface FileRouteTypes {
     | '/register'
     | '/reset-password'
     | '/aban'
+    | '/admin'
     | '/dashboard'
     | '/fund'
     | '/kyc'
@@ -187,7 +277,16 @@ export interface FileRouteTypes {
     | '/transactions'
     | '/wallets'
     | '/withdraw'
+    | '/admin/audit'
+    | '/admin/kyc'
+    | '/admin/rates'
+    | '/admin/security'
+    | '/admin/transactions'
+    | '/admin/users'
+    | '/admin/wallets'
+    | '/admin/withdrawals'
     | '/api/public/paystack-webhook'
+    | '/admin/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -205,7 +304,16 @@ export interface FileRouteTypes {
     | '/transactions'
     | '/wallets'
     | '/withdraw'
+    | '/admin/audit'
+    | '/admin/kyc'
+    | '/admin/rates'
+    | '/admin/security'
+    | '/admin/transactions'
+    | '/admin/users'
+    | '/admin/wallets'
+    | '/admin/withdrawals'
     | '/api/public/paystack-webhook'
+    | '/admin'
   id:
     | '__root__'
     | '/'
@@ -214,6 +322,7 @@ export interface FileRouteTypes {
     | '/register'
     | '/reset-password'
     | '/_app/aban'
+    | '/_app/admin'
     | '/_app/dashboard'
     | '/_app/fund'
     | '/_app/kyc'
@@ -224,7 +333,16 @@ export interface FileRouteTypes {
     | '/_app/transactions'
     | '/_app/wallets'
     | '/_app/withdraw'
+    | '/_app/admin/audit'
+    | '/_app/admin/kyc'
+    | '/_app/admin/rates'
+    | '/_app/admin/security'
+    | '/_app/admin/transactions'
+    | '/_app/admin/users'
+    | '/_app/admin/wallets'
+    | '/_app/admin/withdrawals'
     | '/api/public/paystack-webhook'
+    | '/_app/admin/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -343,12 +461,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppDashboardRouteImport
       parentRoute: typeof AppRouteRoute
     }
+    '/_app/admin': {
+      id: '/_app/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AppAdminRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
     '/_app/aban': {
       id: '/_app/aban'
       path: '/aban'
       fullPath: '/aban'
       preLoaderRoute: typeof AppAbanRouteImport
       parentRoute: typeof AppRouteRoute
+    }
+    '/_app/admin/': {
+      id: '/_app/admin/'
+      path: '/'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AppAdminIndexRouteImport
+      parentRoute: typeof AppAdminRoute
     }
     '/api/public/paystack-webhook': {
       id: '/api/public/paystack-webhook'
@@ -357,11 +489,96 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicPaystackWebhookRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_app/admin/withdrawals': {
+      id: '/_app/admin/withdrawals'
+      path: '/withdrawals'
+      fullPath: '/admin/withdrawals'
+      preLoaderRoute: typeof AppAdminWithdrawalsRouteImport
+      parentRoute: typeof AppAdminRoute
+    }
+    '/_app/admin/wallets': {
+      id: '/_app/admin/wallets'
+      path: '/wallets'
+      fullPath: '/admin/wallets'
+      preLoaderRoute: typeof AppAdminWalletsRouteImport
+      parentRoute: typeof AppAdminRoute
+    }
+    '/_app/admin/users': {
+      id: '/_app/admin/users'
+      path: '/users'
+      fullPath: '/admin/users'
+      preLoaderRoute: typeof AppAdminUsersRouteImport
+      parentRoute: typeof AppAdminRoute
+    }
+    '/_app/admin/transactions': {
+      id: '/_app/admin/transactions'
+      path: '/transactions'
+      fullPath: '/admin/transactions'
+      preLoaderRoute: typeof AppAdminTransactionsRouteImport
+      parentRoute: typeof AppAdminRoute
+    }
+    '/_app/admin/security': {
+      id: '/_app/admin/security'
+      path: '/security'
+      fullPath: '/admin/security'
+      preLoaderRoute: typeof AppAdminSecurityRouteImport
+      parentRoute: typeof AppAdminRoute
+    }
+    '/_app/admin/rates': {
+      id: '/_app/admin/rates'
+      path: '/rates'
+      fullPath: '/admin/rates'
+      preLoaderRoute: typeof AppAdminRatesRouteImport
+      parentRoute: typeof AppAdminRoute
+    }
+    '/_app/admin/kyc': {
+      id: '/_app/admin/kyc'
+      path: '/kyc'
+      fullPath: '/admin/kyc'
+      preLoaderRoute: typeof AppAdminKycRouteImport
+      parentRoute: typeof AppAdminRoute
+    }
+    '/_app/admin/audit': {
+      id: '/_app/admin/audit'
+      path: '/audit'
+      fullPath: '/admin/audit'
+      preLoaderRoute: typeof AppAdminAuditRouteImport
+      parentRoute: typeof AppAdminRoute
+    }
   }
 }
 
+interface AppAdminRouteChildren {
+  AppAdminAuditRoute: typeof AppAdminAuditRoute
+  AppAdminKycRoute: typeof AppAdminKycRoute
+  AppAdminRatesRoute: typeof AppAdminRatesRoute
+  AppAdminSecurityRoute: typeof AppAdminSecurityRoute
+  AppAdminTransactionsRoute: typeof AppAdminTransactionsRoute
+  AppAdminUsersRoute: typeof AppAdminUsersRoute
+  AppAdminWalletsRoute: typeof AppAdminWalletsRoute
+  AppAdminWithdrawalsRoute: typeof AppAdminWithdrawalsRoute
+  AppAdminIndexRoute: typeof AppAdminIndexRoute
+}
+
+const AppAdminRouteChildren: AppAdminRouteChildren = {
+  AppAdminAuditRoute: AppAdminAuditRoute,
+  AppAdminKycRoute: AppAdminKycRoute,
+  AppAdminRatesRoute: AppAdminRatesRoute,
+  AppAdminSecurityRoute: AppAdminSecurityRoute,
+  AppAdminTransactionsRoute: AppAdminTransactionsRoute,
+  AppAdminUsersRoute: AppAdminUsersRoute,
+  AppAdminWalletsRoute: AppAdminWalletsRoute,
+  AppAdminWithdrawalsRoute: AppAdminWithdrawalsRoute,
+  AppAdminIndexRoute: AppAdminIndexRoute,
+}
+
+const AppAdminRouteWithChildren = AppAdminRoute._addFileChildren(
+  AppAdminRouteChildren,
+)
+
 interface AppRouteRouteChildren {
   AppAbanRoute: typeof AppAbanRoute
+  AppAdminRoute: typeof AppAdminRouteWithChildren
   AppDashboardRoute: typeof AppDashboardRoute
   AppFundRoute: typeof AppFundRoute
   AppKycRoute: typeof AppKycRoute
@@ -376,6 +593,7 @@ interface AppRouteRouteChildren {
 
 const AppRouteRouteChildren: AppRouteRouteChildren = {
   AppAbanRoute: AppAbanRoute,
+  AppAdminRoute: AppAdminRouteWithChildren,
   AppDashboardRoute: AppDashboardRoute,
   AppFundRoute: AppFundRoute,
   AppKycRoute: AppKycRoute,
