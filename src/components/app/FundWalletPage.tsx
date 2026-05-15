@@ -61,10 +61,10 @@ function FieldRow({ label, children }: { label: string; children: React.ReactNod
 
 function useDeposit() {
   const { user } = useAuth();
-  return async (method: string, amount: number, currency: string, metadata: object = {}) => {
+  return async (method: string, amount: number, currency: string, metadata: Record<string, unknown> = {}) => {
     if (!user) return;
     const { error } = await supabase.from("deposits").insert({
-      user_id: user.id, method, amount, currency: currency as never, status: "pending", metadata,
+      user_id: user.id, method, amount, currency: currency as never, status: "pending", metadata: metadata as never,
     });
     if (error) toast.error(error.message);
     else toast.success("Deposit initiated — awaiting confirmation");
