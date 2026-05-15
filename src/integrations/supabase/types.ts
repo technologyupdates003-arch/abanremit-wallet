@@ -35,6 +35,66 @@ export type Database = {
         }
         Relationships: []
       }
+      admin_audit_logs: {
+        Row: {
+          action: string
+          admin_id: string
+          created_at: string
+          entity: string | null
+          entity_id: string | null
+          id: string
+          ip: string | null
+          metadata: Json
+          user_agent: string | null
+        }
+        Insert: {
+          action: string
+          admin_id: string
+          created_at?: string
+          entity?: string | null
+          entity_id?: string | null
+          id?: string
+          ip?: string | null
+          metadata?: Json
+          user_agent?: string | null
+        }
+        Update: {
+          action?: string
+          admin_id?: string
+          created_at?: string
+          entity?: string | null
+          entity_id?: string | null
+          id?: string
+          ip?: string | null
+          metadata?: Json
+          user_agent?: string | null
+        }
+        Relationships: []
+      }
+      admin_roles: {
+        Row: {
+          granted_at: string
+          granted_by: string | null
+          id: string
+          role: Database["public"]["Enums"]["admin_role"]
+          user_id: string
+        }
+        Insert: {
+          granted_at?: string
+          granted_by?: string | null
+          id?: string
+          role: Database["public"]["Enums"]["admin_role"]
+          user_id: string
+        }
+        Update: {
+          granted_at?: string
+          granted_by?: string | null
+          id?: string
+          role?: Database["public"]["Enums"]["admin_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
       audit_logs: {
         Row: {
           action: string
@@ -1003,6 +1063,45 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_dashboard_stats: { Args: never; Returns: Json }
+      admin_log: {
+        Args: {
+          _action: string
+          _admin: string
+          _entity: string
+          _entity_id: string
+          _ip: string
+          _meta: Json
+          _ua: string
+        }
+        Returns: undefined
+      }
+      admin_replay_paystack_webhook: {
+        Args: { _id: string }
+        Returns: undefined
+      }
+      admin_set_exchange_rate: {
+        Args: {
+          _from: Database["public"]["Enums"]["wallet_currency"]
+          _ip: string
+          _rate: number
+          _spread: number
+          _to: Database["public"]["Enums"]["wallet_currency"]
+          _ua: string
+        }
+        Returns: undefined
+      }
+      admin_set_wallet_status: {
+        Args: {
+          _ip: string
+          _reason: string
+          _status: Database["public"]["Enums"]["wallet_status"]
+          _ua: string
+          _wallet_id: string
+        }
+        Returns: undefined
+      }
+      bootstrap_super_admin: { Args: { _email: string }; Returns: undefined }
       credit_wallet_from_payment: {
         Args: {
           _authorization: Json
@@ -1019,6 +1118,10 @@ export type Database = {
         Args: { _currency: Database["public"]["Enums"]["wallet_currency"] }
         Returns: string
       }
+      has_admin_role: {
+        Args: { _role: Database["public"]["Enums"]["admin_role"]; _uid: string }
+        Returns: boolean
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -1026,6 +1129,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_admin: { Args: { _uid: string }; Returns: boolean }
       lock_funds_for_withdrawal: {
         Args: {
           _amount: number
@@ -1050,6 +1154,17 @@ export type Database = {
         Returns: undefined
       }
       set_transaction_pin: { Args: { _pin: string }; Returns: undefined }
+      tx_admin_adjust: {
+        Args: {
+          _amount: number
+          _direction: string
+          _ip: string
+          _reason: string
+          _user_agent: string
+          _wallet_id: string
+        }
+        Returns: Json
+      }
       tx_convert_currency: {
         Args: {
           _amount: number
@@ -1078,6 +1193,13 @@ export type Database = {
       verify_transaction_pin: { Args: { _pin: string }; Returns: boolean }
     }
     Enums: {
+      admin_role:
+        | "super_admin"
+        | "finance_admin"
+        | "support_admin"
+        | "compliance_admin"
+        | "fraud_admin"
+        | "operations_admin"
       app_role: "admin" | "user"
       kyc_doc_type: "national_id" | "passport" | "drivers_license"
       kyc_status: "not_submitted" | "pending" | "approved" | "rejected"
@@ -1251,6 +1373,14 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      admin_role: [
+        "super_admin",
+        "finance_admin",
+        "support_admin",
+        "compliance_admin",
+        "fraud_admin",
+        "operations_admin",
+      ],
       app_role: ["admin", "user"],
       kyc_doc_type: ["national_id", "passport", "drivers_license"],
       kyc_status: ["not_submitted", "pending", "approved", "rejected"],
