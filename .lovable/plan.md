@@ -1,100 +1,141 @@
-# Bank Withdrawal Engine — AbanRemit Wallet
+# AbanRemit Transaction Engine
 
-A production-grade payout system using Paystack Transfer APIs with custom UI, atomic ledger, secure webhooks, and realtime updates.
+A banking-grade transaction core that becomes the **single source of truth** for every wallet movement in the app. All existing flows (card funding via Paystack, bank withdrawals via Paystack Transfer) get re-routed through it; new flows (wallet-to-wallet, internal FX) are added on top.
 
-## Phase 1 — Database & Security Foundation
+## Guiding principles
 
-Migrate the schema to support real payouts:
+- **Ledger is truth.** `balance` on `wallets` is a cached projection; every change is backed by an immutable `ledger_entries` row.
+- **Atomic.** Every state change happens inside a single Postgres function with `FOR UPDATE` row locks — no multi-statement client orchestration.
+- **Locked vs available.** `wallets.locked_balance` is added; `available = balance - locked_balance`. All preflight checks use available.
+- **Idempotent.** Every external-facing mutation requires a client-supplied `idempotency_key`; replays return the original result.
+- **Immutable history.** Reversals create new compensating entries — never `UPDATE`/`DELETE` on the ledger.
 
-- **`linked_banks`** (extend existing): add `bank_code`, `currency`, `is_default`, `recipient_code` (cached Paystack recipient), `verified_at`
-- **`withdrawals`** (extend existing): add `bank_id`, `gateway_reference`, `recipient_code`, `narration`, `processed_at`, `failure_reason`, `idempotency_key` (unique). Extend `tx_status` enum with `queued`, `processing`, `reversed`, `cancelled`
-- **`withdrawal_webhooks`**: full webhook audit log (`event`, `payload`, `signature`, `processed`, `processed_at`)
-- **`pin_attempts`**: track failed PIN attempts per user with lockout window
-- **`profiles`**: already has `transaction_pin_hash` — add `pin_locked_until`, `daily_withdrawal_total`, `daily_withdrawal_reset_at`
-- RLS policies for all new tables (own-row read, no client write on ledger/webhooks)
+---
 
-Atomic Postgres functions (SECURITY DEFINER):
-- `set_transaction_pin(_pin)` — bcrypt hash via pgcrypto
-- `verify_transaction_pin(_pin)` — constant-time check + lockout enforcement
-- `lock_funds_for_withdrawal(_wallet_id, _amount, _withdrawal_id)` — debits wallet, writes pending ledger row, enforces balance + daily limit, fully atomic with `FOR UPDATE`
-- `finalize_withdrawal(_withdrawal_id, _gateway_ref)` — marks success, finalizes ledger
-- `reverse_withdrawal(_withdrawal_id, _reason)` — credits wallet back, writes reversal ledger entry, marks failed/reversed
+## Phase 1 — Schema (single migration)
 
-## Phase 2 — Paystack Transfer Server Functions
+**Extend `wallets`:**
+- `locked_balance numeric not null default 0`
+- `status wallet_status not null default 'active'` (`active|frozen|closed`)
+- generated column `available_balance` = `balance - locked_balance`
+- CHECK `balance >= 0`, `locked_balance >= 0`, `locked_balance <= balance`
 
-`src/lib/transfers.functions.ts`:
+**New `transactions` (master orchestrator table):**
+`id, reference (unique), idempotency_key (unique), user_id, type (tx_type enum), status (tx_status — extend with queued/locked/processing/successful/reversed), sender_wallet_id, receiver_wallet_id, amount, fee, source_currency, destination_currency, exchange_rate, gateway, gateway_reference, narration, metadata jsonb, ip, user_agent, processed_at, created_at, updated_at`
 
-- `listBanks({ currency })` — proxies `GET /bank?currency=`, cached
-- `resolveAccount({ accountNumber, bankCode })` — `GET /bank/resolve` for real-time name verification
-- `addLinkedBank({ bankCode, accountNumber, currency })` — resolves name, creates Paystack `transferrecipient`, stores `recipient_code`
-- `setDefaultBank` / `deleteLinkedBank`
-- `setTransactionPin({ pin })` / `verifyTransactionPin({ pin })`
-- `initiateWithdrawal({ walletId, bankId, amount, pin, idempotencyKey })`:
-  1. Verify PIN (calls RPC, lockout enforced)
-  2. Validate KYC, currency, daily limits
-  3. Insert `withdrawals` row with idempotency key
-  4. Call `lock_funds_for_withdrawal` (atomic debit + ledger lock)
-  5. Call Paystack `POST /transfer` with reference
-  6. On API failure → `reverse_withdrawal` immediately
-  7. Return pending state — webhook finalizes
+**Extend `wallet_ledger` → rename concept to `ledger_entries`** (keep table name `wallet_ledger` for back-compat, add columns):
+- `transaction_id uuid` (FK to transactions)
+- `entry_type` (`debit_lock | debit_settle | credit | fee | fx_in | fx_out | reversal`)
+- `reference text`
+- index on `(transaction_id)`, `(wallet_id, created_at desc)`
 
-## Phase 3 — Webhook Processing
+**New `transaction_status_history`:** append-only audit of state transitions (`transaction_id, from_status, to_status, reason, actor, created_at`).
 
-`src/routes/api/public/paystack-webhook.ts` (extend existing):
+**New `exchange_rates`:** `from_currency, to_currency, rate, spread, updated_at` (PK on pair). Seed KES↔USD, KES↔ABAN, USD↔ABAN.
 
-- Add handlers for `transfer.success`, `transfer.failed`, `transfer.reversed`
-- HMAC-SHA512 verification (already in place)
-- Idempotency via `idempotency_keys` table (already in place)
-- Log every event to `withdrawal_webhooks`
-- Call `finalize_withdrawal` or `reverse_withdrawal` accordingly
-- Insert notification on completion
+**New `audit_logs`:** `user_id, action, entity, entity_id, ip, user_agent, metadata, created_at`. RLS: own-rows read.
 
-## Phase 4 — Premium Custom UI
+**Extend `idempotency_keys`:** add `response jsonb`, `transaction_id uuid` to cache replay results.
 
-Rebuild `WithdrawPage.tsx` with multi-step flow:
+**RLS:** users read own `transactions`, own `audit_logs`, own `ledger_entries`. No client write on any of these — all writes go through SECURITY DEFINER RPCs.
 
-1. **Step 1 — Method & Wallet**: Currency wallet picker showing balance, withdrawal method tabs (Bank / Wallet / M-Pesa)
-2. **Step 2 — Beneficiary**: Saved bank list with default star + "Add new bank" inline form (bank dropdown from `listBanks`, account number → live `resolveAccount` to show verified name)
-3. **Step 3 — Amount**: Amount input, fee preview, "you receive" calculation, ETA badge
-4. **Step 4 — Review & PIN**: Summary card + 4-digit PIN entry (shadcn `InputOTP`), with attempts-remaining indicator
-5. **Step 5 — Processing**: Animated processing state, polls `withdrawals` row, transitions to success/failure with motion animations + downloadable receipt link
+---
 
-Components:
-- `WithdrawWizard.tsx` — step orchestrator with progress indicator
-- `BankPicker.tsx` — search + select with bank logos/initials
-- `AccountVerifier.tsx` — debounced live verification UI
-- `PinEntry.tsx` — secure PIN modal with shake-on-fail
-- `WithdrawalReceipt.tsx` — printable receipt
-- `WithdrawalHistoryPage.tsx` — filters (status, currency, date range), search, expandable rows, infinite scroll, status badges
+## Phase 2 — Atomic Postgres engine (SECURITY DEFINER functions)
 
-## Phase 5 — Realtime + Notifications
+All in one migration, all `SET search_path = public`, all use `FOR UPDATE`.
 
-- Subscribe to `withdrawals` and `wallets` rows for the user → live status updates
-- Subscribe to `notifications` → toast on completion
-- Refresh wallet balance card automatically when ledger row inserts
+1. **`tx_lock_funds(_tx_id, _wallet_id, _amount, _fee)`**
+   Locks wallet row, validates `available >= amount+fee`, increments `locked_balance`, writes `debit_lock` ledger row, transitions tx → `locked`.
 
-## Phase 6 — Security Layer
+2. **`tx_settle_transfer(_tx_id)`** (wallet→wallet & FX)
+   Locks both wallet rows in deterministic id order (deadlock prevention), debits sender (decrement balance + locked_balance), credits receiver, writes `debit_settle` + `credit` ledger rows, sets tx → `successful`, inserts notifications both sides, writes audit log.
 
-- Rate limit: max 5 withdrawals per hour per user (enforced in RPC)
-- Velocity check: alert + block if amount > 3× rolling 7-day average
-- IP + user-agent logged to `security_logs` per withdrawal
-- PIN: 5 failed attempts → 30-min lockout
-- Daily withdrawal cap (configurable per KYC tier)
+3. **`tx_settle_external_debit(_tx_id, _gateway_ref)`** (withdrawals/Paystack transfer success)
+   Finalizes a previously-locked debit: decrements balance & locked_balance, writes `debit_settle` ledger row, tx → `successful`. Replaces existing `finalize_withdrawal`.
 
-## Technical Details
+4. **`tx_credit_external(_tx_id, _gateway_ref)`** (card funding success)
+   Idempotent credit; finds wallet, increments balance, writes `credit` ledger row, tx → `successful`. Replaces existing `credit_wallet_from_payment`.
 
-- Paystack endpoints: `/bank`, `/bank/resolve`, `/transferrecipient`, `/transfer`
-- Currency mapping: KES → NGN/KES rails; USD/EUR/GBP routed via Paystack USD where available, else error early with clear message
-- All amounts converted to subunits (×100) at API boundary only
-- Idempotency: client-generated UUID per withdraw attempt → unique constraint blocks dupes
-- All RPCs `SECURITY DEFINER` with `SET search_path = public`
-- Ledger entries are append-only (no UPDATE policy)
-- Webhook signature uses `PAYSTACK_SECRET_KEY` (HMAC-SHA512) — already wired
+5. **`tx_reverse(_tx_id, _reason)`**
+   Compensating entries:
+   - If still `locked` → release lock (decrement `locked_balance`), no balance change.
+   - If `successful` debit → credit back, write `reversal` ledger entry.
+   - Tx → `reversed` or `failed`. Always logs status history + notification.
 
-## Out of Scope (future)
-- Admin panel UI (backend tables ready)
-- Biometric mobile auth
-- Multi-currency FX conversion engine
-- M-Pesa & wallet-to-wallet transfers (UI scaffolded but routed to "coming soon" until M-Pesa Daraja is integrated separately)
+6. **`tx_convert_currency(_tx_id, _from_wallet_id, _to_wallet_id, _amount, _pin)`**
+   Verifies PIN, snapshots rate from `exchange_rates`, locks both wallets, debits source, credits destination at `amount * rate`, stores rate inside tx row, writes paired `fx_out`/`fx_in` ledger entries.
 
-This will land in 4 sequential edits: (1) migration, (2) server functions + webhook extension, (3) UI components + wizard, (4) history page + realtime wiring.
+7. **`tx_log_status(...)`**, **`tx_log_audit(...)`** — internal helpers used by all the above.
+
+8. **Trigger `wallets_balance_invariant`** — `BEFORE UPDATE` on `wallets`, raises if `balance < 0` or `locked_balance > balance`.
+
+9. **Reconciliation view `v_wallet_ledger_check`** — sums ledger debits/credits per wallet and flags drift vs `wallets.balance`. Used by admin/cron later.
+
+---
+
+## Phase 3 — Server functions (`src/lib/transactions.functions.ts`)
+
+All `createServerFn` + `requireSupabaseAuth`. Zod-validated. Each captures IP/user-agent and writes to `audit_logs`.
+
+- `transferToWallet({ fromWalletId, toWalletNumber, amount, narration, pin, idempotencyKey })` — looks up receiver wallet, creates tx, calls `tx_lock_funds` then `tx_settle_transfer` in one round-trip via a wrapper RPC `tx_execute_transfer`.
+- `convertCurrency({ fromWalletId, toCurrency, amount, pin, idempotencyKey })` — RPC `tx_convert_currency`.
+- `getExchangeRate({ from, to })` — public read of `exchange_rates`.
+- `listTransactions({ filter, cursor })` — paginated, joins ledger.
+- `getTransaction({ id })` — full detail incl. ledger entries + status history.
+
+**Refactor existing flows to use the new engine (no behavior change for users):**
+- `src/routes/api/public/paystack-webhook.ts` — replace calls to `credit_wallet_from_payment` / `finalize_withdrawal` / `reverse_withdrawal` with `tx_credit_external` / `tx_settle_external_debit` / `tx_reverse`. Keep HMAC-SHA512 verify + `idempotency_keys` guard already in place.
+- `src/lib/transfers.functions.ts::initiateWithdrawal` — keep PIN verify + Paystack call, but route the lock through `tx_lock_funds` against the new `transactions` row (instead of `lock_funds_for_withdrawal` against `withdrawals`). Mirror `withdrawals` row stays for UX/history but becomes a projection of the master `transactions` row.
+- `src/lib/paystack.functions.ts::initializeTransaction` — write a `transactions` row (`type=card_funding`, `status=pending`) alongside the existing `payment_transactions` row, so the webhook can resolve it.
+
+---
+
+## Phase 4 — Idempotency, fraud, security layer
+
+- All mutating server fns require `idempotencyKey: z.string().uuid()`. Wrapper RPC checks `idempotency_keys` table first; on hit returns cached `response` jsonb.
+- Velocity: per-RPC, count tx in last 60s/24h; soft-limit configurable (5/min, 20/day for transfers default). Block + audit log on breach.
+- PIN: reuse existing `verify_transaction_pin` with 5-attempt → 30-min lockout (already in DB). Required for transfer, convert, withdraw.
+- IP + UA captured via `getRequestIP` / `getRequestHeader` and attached to tx + audit log.
+- Wallet ownership re-validated server-side on every call (RLS + explicit `user_id` check inside RPCs).
+
+---
+
+## Phase 5 — UI: Wallet-to-wallet & FX
+
+Two new screens, premium glassmorphism matching existing wizards (`WithdrawPage` style).
+
+- **`SendMoneyPage` rebuild** (`src/components/app/SendMoneyPage.tsx`) — 4-step: source wallet → recipient wallet number (live lookup shows recipient name/currency, currency-match check) → amount + narration → PIN + review. Realtime status via `transactions` subscription + receipt screen.
+- **`ConvertPage` (new)** — source wallet → target currency (dropdown of user's other wallets) → amount with live rate preview + "you receive" → PIN. Route `/_app/convert`. Add nav entry.
+
+**Realtime wiring (shared hook `useWalletRealtime`):** subscribe to `wallets` (own rows) + `transactions` (own rows). Invalidate React Query keys `['wallets']`, `['txs']`, `['tx', id]`. Use in Dashboard, Wallets, Transactions pages.
+
+**Transactions page upgrade:** add status badges for new statuses (`locked`, `processing`, `reversed`), show fee / fx-rate columns when present, expandable row → ledger entries.
+
+---
+
+## Phase 6 — Out of scope (explicit)
+
+To keep this shippable in one round; scaffolded but deferred:
+- BullMQ/Redis queue (Cloudflare Worker runtime can't host long-running queues; webhook + pg_cron retries cover the same need for now)
+- Admin panel UI (tables/RPCs are admin-ready; UI later)
+- Device fingerprinting beyond UA
+- Geo-risk scoring
+- Real-time WebSocket layer beyond Supabase Realtime
+- Pulling FX rates from an external feed (rates seeded + admin-updatable; live feed integration later)
+- M-Pesa Daraja, AbanCoin trading engine, virtual cards, merchant payments — engine supports the tx types, surfaces stay "coming soon" until those gateways are integrated
+
+## Tech notes
+
+- All amounts kept as `numeric(20,4)`; subunit conversion happens only at Paystack boundary.
+- Deadlock-safe two-wallet locking: always `SELECT ... FOR UPDATE ORDER BY id`.
+- Generated `available_balance` lets clients read it directly with no extra logic.
+- Reversal of a `successful` external debit only credits back if the gateway confirms reversal — webhook-driven, never client-initiated.
+- `transactions` table becomes the canonical join point; `wallet_transactions`, `withdrawals`, `payment_transactions` continue to exist as type-specific projections backed by `transaction_id` FK (added now, populated going forward).
+
+## Delivery order
+
+1. Migration: schema + RPCs + trigger + seed FX rates.
+2. Server fns + webhook refactor.
+3. UI: SendMoney rebuild, Convert page, realtime hook, route registration.
+4. Transactions page badges/expansion.
