@@ -1,6 +1,6 @@
 import { GlassCard, PageHeader } from "./shared";
-import { Wallet, Smartphone, Building2 } from "lucide-react";
-import { useState } from "react";
+import { Wallet, Smartphone, Building2, CheckCircle2, Loader2 } from "lucide-react";
+import { useState, useEffect } from "react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,6 +10,8 @@ import { useAuth } from "@/lib/auth-context";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { lookupWallet, transferToWallet } from "@/lib/transactions.functions";
 
 export function SendMoneyPage() {
   return (
@@ -80,20 +82,103 @@ function useSend() {
 }
 
 function SendToWallet() {
-  const send = useSend();
+  const { user } = useAuth();
+  const qc = useQueryClient();
+  const lookup = useServerFn(lookupWallet);
+  const transfer = useServerFn(transferToWallet);
+
+  const { data: wallets = [] } = useQuery({
+    queryKey: ["wallets", user?.id],
+    queryFn: async () => (await supabase.from("wallets").select("*").order("is_primary", { ascending: false })).data ?? [],
+    enabled: !!user,
+  });
+
+  const [fromId, setFromId] = useState("");
   const [walletNum, setWalletNum] = useState("");
   const [amount, setAmount] = useState("");
   const [desc, setDesc] = useState("");
-  const [step, setStep] = useState<"form" | "pin">("form");
+  const [step, setStep] = useState<"form" | "pin" | "done">("form");
+  const [recipient, setRecipient] = useState<{ fullName: string; currency: string; walletId: string } | null>(null);
+  const [lookingUp, setLookingUp] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [result, setResult] = useState<{ reference: string } | null>(null);
 
-  if (step === "pin") return <PinPad onConfirm={async () => { await send({ type: "send", amount: Number(amount), currency: "USD", description: desc, metadata: { recipient_wallet: walletNum } }); setStep("form"); setWalletNum(""); setAmount(""); }} />;
+  useEffect(() => { if (!fromId && wallets[0]) setFromId(wallets[0].id); }, [wallets, fromId]);
+  const fromWallet = wallets.find((w) => w.id === fromId);
+
+  useEffect(() => {
+    if (walletNum.length < 6) { setRecipient(null); return; }
+    let cancelled = false;
+    setLookingUp(true);
+    const t = setTimeout(async () => {
+      try {
+        const r = await lookup({ data: { walletNumber: walletNum.trim() } });
+        if (!cancelled) setRecipient(r.found ? { fullName: r.fullName, currency: r.currency, walletId: r.walletId } : null);
+      } catch { if (!cancelled) setRecipient(null); }
+      finally { if (!cancelled) setLookingUp(false); }
+    }, 350);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [walletNum, lookup]);
+
+  if (step === "done" && result) {
+    return (
+      <div className="text-center space-y-4 py-6">
+        <CheckCircle2 className="h-14 w-14 text-success mx-auto" />
+        <div>
+          <div className="text-lg font-semibold">Transfer complete</div>
+          <div className="text-xs text-muted-foreground font-mono mt-1">{result.reference}</div>
+        </div>
+        <Button onClick={() => { setStep("form"); setWalletNum(""); setAmount(""); setDesc(""); setRecipient(null); setResult(null); }} className="w-full h-11 gradient-primary text-primary-foreground">Done</Button>
+      </div>
+    );
+  }
+
+  if (step === "pin") {
+    const onConfirm = async (pin: string) => {
+      setSubmitting(true);
+      try {
+        const r = await transfer({ data: {
+          fromWalletId: fromId, toWalletNumber: walletNum.trim(),
+          amount: Number(amount), narration: desc || undefined,
+          pin, idempotencyKey: crypto.randomUUID(),
+        }});
+        setResult({ reference: r.reference });
+        setStep("done");
+        qc.invalidateQueries();
+        toast.success("Transfer settled");
+      } catch (e) { toast.error((e as Error).message); }
+      finally { setSubmitting(false); }
+    };
+    return <PinPad onConfirm={onConfirm} loading={submitting} />;
+  }
+
+  const currencyMismatch = recipient && fromWallet && recipient.currency !== fromWallet.currency;
+  const canContinue = !!fromWallet && !!recipient && !currencyMismatch && Number(amount) > 0 && Number(amount) <= Number(fromWallet?.balance ?? 0);
 
   return (
     <div className="space-y-3">
-      <FieldRow label="Recipient wallet number"><Input value={walletNum} onChange={(e) => setWalletNum(e.target.value)} placeholder="ABN-USD-123456" /></FieldRow>
-      <FieldRow label="Amount"><Input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} /></FieldRow>
+      <FieldRow label="From wallet">
+        <select value={fromId} onChange={(e) => setFromId(e.target.value)} className="flex h-10 w-full rounded-md border border-input bg-input/50 px-3 text-sm">
+          {wallets.map((w) => <option key={w.id} value={w.id}>{w.currency} · {Number(w.balance).toLocaleString()} · {w.wallet_number}</option>)}
+        </select>
+      </FieldRow>
+      <FieldRow label="Recipient wallet number">
+        <Input value={walletNum} onChange={(e) => setWalletNum(e.target.value.toUpperCase())} placeholder="ABN-USD-123456" />
+      </FieldRow>
+      {lookingUp && <div className="text-xs text-muted-foreground flex items-center gap-2"><Loader2 className="h-3 w-3 animate-spin" /> Verifying recipient…</div>}
+      {recipient && (
+        <div className={`text-xs rounded-md px-3 py-2 ${currencyMismatch ? "bg-destructive/10 text-destructive" : "bg-success/10 text-success"}`}>
+          {currencyMismatch ? `Currency mismatch — recipient holds ${recipient.currency}` : `Sending to ${recipient.fullName} (${recipient.currency})`}
+        </div>
+      )}
+      {walletNum.length >= 6 && !lookingUp && !recipient && (
+        <div className="text-xs rounded-md px-3 py-2 bg-destructive/10 text-destructive">Recipient not found</div>
+      )}
+      <FieldRow label={`Amount${fromWallet ? ` (${fromWallet.currency})` : ""}`}>
+        <Input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} />
+      </FieldRow>
       <FieldRow label="Description (optional)"><Input value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="Rent, gift, payment…" /></FieldRow>
-      <Button disabled={!walletNum || !amount} onClick={() => setStep("pin")} className="w-full h-11 gradient-primary glow-primary text-primary-foreground">Continue</Button>
+      <Button disabled={!canContinue} onClick={() => setStep("pin")} className="w-full h-11 gradient-primary glow-primary text-primary-foreground">Continue</Button>
     </div>
   );
 }
