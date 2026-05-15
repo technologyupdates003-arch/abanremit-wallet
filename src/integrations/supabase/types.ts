@@ -137,29 +137,44 @@ export type Database = {
         Row: {
           account_name: string
           account_number: string
+          bank_code: string | null
           bank_name: string
           country: string | null
           created_at: string
+          currency: Database["public"]["Enums"]["wallet_currency"] | null
           id: string
+          is_default: boolean
+          recipient_code: string | null
           user_id: string
+          verified_at: string | null
         }
         Insert: {
           account_name: string
           account_number: string
+          bank_code?: string | null
           bank_name: string
           country?: string | null
           created_at?: string
+          currency?: Database["public"]["Enums"]["wallet_currency"] | null
           id?: string
+          is_default?: boolean
+          recipient_code?: string | null
           user_id: string
+          verified_at?: string | null
         }
         Update: {
           account_name?: string
           account_number?: string
+          bank_code?: string | null
           bank_name?: string
           country?: string | null
           created_at?: string
+          currency?: Database["public"]["Enums"]["wallet_currency"] | null
           id?: string
+          is_default?: boolean
+          recipient_code?: string | null
           user_id?: string
+          verified_at?: string | null
         }
         Relationships: []
       }
@@ -328,6 +343,27 @@ export type Database = {
         }
         Relationships: []
       }
+      pin_attempts: {
+        Row: {
+          failed_count: number
+          last_failed_at: string | null
+          locked_until: string | null
+          user_id: string
+        }
+        Insert: {
+          failed_count?: number
+          last_failed_at?: string | null
+          locked_until?: string | null
+          user_id: string
+        }
+        Update: {
+          failed_count?: number
+          last_failed_at?: string | null
+          locked_until?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           address: string | null
@@ -335,12 +371,16 @@ export type Database = {
           city: string | null
           country: string | null
           created_at: string
+          daily_withdrawal_reset_at: string
+          daily_withdrawal_total: number
           email: string | null
           full_name: string | null
           id: string
           kyc_status: Database["public"]["Enums"]["kyc_status"]
+          kyc_tier: number
           occupation: string | null
           phone: string | null
+          pin_locked_until: string | null
           transaction_pin_hash: string | null
           two_factor_enabled: boolean
           updated_at: string
@@ -352,12 +392,16 @@ export type Database = {
           city?: string | null
           country?: string | null
           created_at?: string
+          daily_withdrawal_reset_at?: string
+          daily_withdrawal_total?: number
           email?: string | null
           full_name?: string | null
           id: string
           kyc_status?: Database["public"]["Enums"]["kyc_status"]
+          kyc_tier?: number
           occupation?: string | null
           phone?: string | null
+          pin_locked_until?: string | null
           transaction_pin_hash?: string | null
           two_factor_enabled?: boolean
           updated_at?: string
@@ -369,12 +413,16 @@ export type Database = {
           city?: string | null
           country?: string | null
           created_at?: string
+          daily_withdrawal_reset_at?: string
+          daily_withdrawal_total?: number
           email?: string | null
           full_name?: string | null
           id?: string
           kyc_status?: Database["public"]["Enums"]["kyc_status"]
+          kyc_tier?: number
           occupation?: string | null
           phone?: string | null
+          pin_locked_until?: string | null
           transaction_pin_hash?: string | null
           two_factor_enabled?: boolean
           updated_at?: string
@@ -633,40 +681,106 @@ export type Database = {
         }
         Relationships: []
       }
+      withdrawal_webhooks: {
+        Row: {
+          created_at: string
+          error: string | null
+          event: string
+          id: string
+          payload: Json
+          processed: boolean
+          processed_at: string | null
+          signature: string | null
+        }
+        Insert: {
+          created_at?: string
+          error?: string | null
+          event: string
+          id?: string
+          payload: Json
+          processed?: boolean
+          processed_at?: string | null
+          signature?: string | null
+        }
+        Update: {
+          created_at?: string
+          error?: string | null
+          event?: string
+          id?: string
+          payload?: Json
+          processed?: boolean
+          processed_at?: string | null
+          signature?: string | null
+        }
+        Relationships: []
+      }
       withdrawals: {
         Row: {
           amount: number
+          bank_id: string | null
           created_at: string
           currency: Database["public"]["Enums"]["wallet_currency"]
           destination: Json
+          failure_reason: string | null
           fee: number
+          gateway_reference: string | null
           id: string
+          idempotency_key: string | null
+          ip_address: string | null
           method: string
+          narration: string | null
+          processed_at: string | null
+          recipient_code: string | null
+          reference: string | null
           status: Database["public"]["Enums"]["tx_status"]
+          updated_at: string
+          user_agent: string | null
           user_id: string
           wallet_id: string | null
         }
         Insert: {
           amount: number
+          bank_id?: string | null
           created_at?: string
           currency: Database["public"]["Enums"]["wallet_currency"]
           destination?: Json
+          failure_reason?: string | null
           fee?: number
+          gateway_reference?: string | null
           id?: string
+          idempotency_key?: string | null
+          ip_address?: string | null
           method: string
+          narration?: string | null
+          processed_at?: string | null
+          recipient_code?: string | null
+          reference?: string | null
           status?: Database["public"]["Enums"]["tx_status"]
+          updated_at?: string
+          user_agent?: string | null
           user_id: string
           wallet_id?: string | null
         }
         Update: {
           amount?: number
+          bank_id?: string | null
           created_at?: string
           currency?: Database["public"]["Enums"]["wallet_currency"]
           destination?: Json
+          failure_reason?: string | null
           fee?: number
+          gateway_reference?: string | null
           id?: string
+          idempotency_key?: string | null
+          ip_address?: string | null
           method?: string
+          narration?: string | null
+          processed_at?: string | null
+          recipient_code?: string | null
+          reference?: string | null
           status?: Database["public"]["Enums"]["tx_status"]
+          updated_at?: string
+          user_agent?: string | null
           user_id?: string
           wallet_id?: string | null
         }
@@ -693,6 +807,10 @@ export type Database = {
         }
         Returns: number
       }
+      finalize_withdrawal: {
+        Args: { _gateway_reference: string; _withdrawal_id: string }
+        Returns: undefined
+      }
       gen_wallet_number: {
         Args: { _currency: Database["public"]["Enums"]["wallet_currency"] }
         Returns: string
@@ -704,12 +822,34 @@ export type Database = {
         }
         Returns: boolean
       }
+      lock_funds_for_withdrawal: {
+        Args: {
+          _amount: number
+          _fee: number
+          _wallet_id: string
+          _withdrawal_id: string
+        }
+        Returns: number
+      }
+      reverse_withdrawal: {
+        Args: { _reason: string; _withdrawal_id: string }
+        Returns: undefined
+      }
+      set_transaction_pin: { Args: { _pin: string }; Returns: undefined }
+      verify_transaction_pin: { Args: { _pin: string }; Returns: boolean }
     }
     Enums: {
       app_role: "admin" | "user"
       kyc_doc_type: "national_id" | "passport" | "drivers_license"
       kyc_status: "not_submitted" | "pending" | "approved" | "rejected"
-      tx_status: "pending" | "completed" | "failed" | "reversed"
+      tx_status:
+        | "pending"
+        | "completed"
+        | "failed"
+        | "reversed"
+        | "queued"
+        | "processing"
+        | "cancelled"
       tx_type:
         | "deposit"
         | "withdrawal"
@@ -850,7 +990,15 @@ export const Constants = {
       app_role: ["admin", "user"],
       kyc_doc_type: ["national_id", "passport", "drivers_license"],
       kyc_status: ["not_submitted", "pending", "approved", "rejected"],
-      tx_status: ["pending", "completed", "failed", "reversed"],
+      tx_status: [
+        "pending",
+        "completed",
+        "failed",
+        "reversed",
+        "queued",
+        "processing",
+        "cancelled",
+      ],
       tx_type: [
         "deposit",
         "withdrawal",

@@ -118,6 +118,44 @@ export const Route = createFileRoute("/api/public/paystack-webhook")({
               failure_reason: payload.data.gateway_response ?? "charge_failed",
             })
             .eq("reference", payload.data.reference);
+        } else if (
+          payload.event === "transfer.success" ||
+          payload.event === "transfer.failed" ||
+          payload.event === "transfer.reversed"
+        ) {
+          // Audit log
+          await supabaseAdmin.from("withdrawal_webhooks").insert({
+            event: payload.event,
+            payload: payload as never,
+            signature,
+            processed: false,
+          });
+
+          const ref = payload.data.reference;
+          const { data: wd } = await supabaseAdmin
+            .from("withdrawals")
+            .select("id, status")
+            .eq("reference", ref)
+            .maybeSingle();
+
+          if (wd) {
+            if (payload.event === "transfer.success") {
+              await supabaseAdmin.rpc("finalize_withdrawal" as never, {
+                _withdrawal_id: wd.id,
+                _gateway_reference: String(payload.data.id ?? ref),
+              } as never);
+            } else {
+              await supabaseAdmin.rpc("reverse_withdrawal" as never, {
+                _withdrawal_id: wd.id,
+                _reason: payload.data.gateway_response ?? payload.event,
+              } as never);
+            }
+            await supabaseAdmin
+              .from("withdrawal_webhooks")
+              .update({ processed: true, processed_at: new Date().toISOString() })
+              .eq("event", payload.event)
+              .eq("payload->>reference", ref);
+          }
         }
 
         return new Response("ok", { status: 200 });
