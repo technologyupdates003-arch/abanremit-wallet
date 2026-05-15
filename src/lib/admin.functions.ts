@@ -26,7 +26,7 @@ export const adminDashboardStats = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const { data, error } = await context.supabase.rpc("admin_dashboard_stats" as never);
     if (error) throw new Error(error.message);
-    return data as Record<string, unknown>;
+    return data as any;
   });
 
 export const adminRecentTransactions = createServerFn({ method: "GET" })
@@ -38,7 +38,7 @@ export const adminRecentTransactions = createServerFn({ method: "GET" })
       .order("created_at", { ascending: false })
       .limit(20);
     if (error) throw new Error(error.message);
-    return data as unknown as Array<Record<string, unknown>>;
+    return data as unknown as any[];
   });
 
 // =============== USERS ===============
@@ -60,7 +60,7 @@ export const adminListUsers = createServerFn({ method: "POST" })
     if (data.kycStatus) q = q.eq("kyc_status", data.kycStatus as never);
     const { data: rows, count, error } = await q.order("created_at", { ascending: false }).range(data.offset, data.offset + data.limit - 1);
     if (error) throw new Error(error.message);
-    return { rows: (rows ?? []) as unknown as Array<Record<string, unknown>>, total: count ?? 0 };
+    return { rows: (rows ?? []) as unknown as any[], total: count ?? 0 };
   });
 
 const GetUserInput = z.object({ userId: z.string().uuid() });
@@ -190,7 +190,7 @@ export const adminKycQueue = createServerFn({ method: "GET" })
       .order("created_at", { ascending: true })
       .limit(50);
     if (error) throw new Error(error.message);
-    return (data ?? []) as unknown as Array<Record<string, unknown>>;
+    return (data ?? []) as unknown as any[];
   });
 
 // =============== TRANSACTIONS ===============
@@ -213,7 +213,7 @@ export const adminListTransactions = createServerFn({ method: "POST" })
     if (data.search) q = q.or(`reference.ilike.%${data.search}%,user_id.eq.${data.search}`);
     const { data: rows, count, error } = await q.order("created_at", { ascending: false }).range(data.offset, data.offset + data.limit - 1);
     if (error) throw new Error(error.message);
-    return { rows: (rows ?? []) as unknown as Array<Record<string, unknown>>, total: count ?? 0 };
+    return { rows: (rows ?? []) as unknown as any[], total: count ?? 0 };
   });
 
 const TxDetailInput = z.object({ transactionId: z.string().uuid() });
@@ -239,7 +239,7 @@ export const adminListWithdrawals = createServerFn({ method: "POST" })
     if (data.status) q = q.eq("status", data.status as never);
     const { data: rows, count, error } = await q.order("created_at", { ascending: false }).range(data.offset, data.offset + data.limit - 1);
     if (error) throw new Error(error.message);
-    return { rows: (rows ?? []) as unknown as Array<Record<string, unknown>>, total: count ?? 0 };
+    return { rows: (rows ?? []) as unknown as any[], total: count ?? 0 };
   });
 
 const WdActionInput = z.object({
@@ -266,7 +266,7 @@ export const adminListRates = createServerFn({ method: "GET" })
   .middleware([requireAdmin])
   .handler(async ({ context }) => {
     const { data } = await context.supabase.from("exchange_rates").select("*").order("from_currency");
-    return (data ?? []) as unknown as Array<Record<string, unknown>>;
+    return (data ?? []) as unknown as any[];
   });
 
 const RateInput = z.object({
@@ -298,7 +298,7 @@ export const adminListAudits = createServerFn({ method: "POST" })
     if (data.action) q = q.eq("action", data.action as never);
     const { data: rows, count, error } = await q.order("created_at", { ascending: false }).range(data.offset, data.offset + data.limit - 1);
     if (error) throw new Error(error.message);
-    return { rows: (rows ?? []) as unknown as Array<Record<string, unknown>>, total: count ?? 0 };
+    return { rows: (rows ?? []) as unknown as any[], total: count ?? 0 };
   });
 
 // =============== SECURITY ===============
@@ -311,9 +311,9 @@ export const adminSecurityOverview = createServerFn({ method: "GET" })
       context.supabase.from("audit_logs" as never).select("*").order("created_at", { ascending: false }).limit(50),
     ]);
     return {
-      pinAttempts: (locks.data ?? []) as unknown as Array<Record<string, unknown>>,
-      stuckWebhooks: (attempts.data ?? []) as unknown as Array<Record<string, unknown>>,
-      recentEvents: (logs.data ?? []) as unknown as Array<Record<string, unknown>>,
+      pinAttempts: (locks.data ?? []) as unknown as any[],
+      stuckWebhooks: (attempts.data ?? []) as unknown as any[],
+      recentEvents: (logs.data ?? []) as unknown as any[],
     };
   });
 
