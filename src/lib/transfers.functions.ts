@@ -163,22 +163,6 @@ export const setTransactionPin = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: z.input<typeof PinInput>) => PinInput.parse(d))
   .handler(async ({ data, context }) => {
-    const { error } = await supabaseAdmin.rpc("set_transaction_pin" as never, { _pin: data.pin } as never);
-    if (error) throw new Error(error.message);
-    // Run as user via admin: set_transaction_pin uses auth.uid() - need to call as user.
-    // Since admin bypasses RLS but auth.uid() returns null, do direct update instead:
-    // (replaced below)
-    void context;
-    return { ok: true };
-  });
-
-// Override: the SECURITY DEFINER pin functions use auth.uid(); when called from
-// admin client auth.uid() is null. Use the user-context supabase client instead.
-// (We re-implement set / verify here using the user-scoped client.)
-export const setTransactionPinV2 = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((d: z.input<typeof PinInput>) => PinInput.parse(d))
-  .handler(async ({ data, context }) => {
     const { error } = await context.supabase.rpc("set_transaction_pin" as never, { _pin: data.pin } as never);
     if (error) throw new Error(error.message);
     return { ok: true };
