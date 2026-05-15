@@ -1,9 +1,9 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { AuthShell } from "@/components/auth/AuthShell";
-import { LoginForm } from "@/components/auth/LoginForm";
+import { RegisterForm } from "@/components/auth/RegisterForm";
 
-export const Route = createFileRoute("/")({
+export const Route = createFileRoute("/register")({
   beforeLoad: async () => {
     if (typeof window === "undefined") return;
     const { data } = await supabase.auth.getSession();
@@ -11,7 +11,7 @@ export const Route = createFileRoute("/")({
   },
   component: () => (
     <AuthShell>
-      <LoginForm />
+      <RegisterForm />
     </AuthShell>
   ),
 });
