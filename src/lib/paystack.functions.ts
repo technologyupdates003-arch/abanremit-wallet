@@ -32,7 +32,7 @@ async function paystack<T = unknown>(
 
 const InitInput = z.object({
   amount: z.number().positive().max(10_000_000),
-  currency: z.enum(["KES", "USD", "GHS", "NGN", "ZAR"]),
+  currency: z.enum(["KES", "USD", "EUR", "GBP"]),
   email: z.string().email(),
   saveCard: z.boolean().optional().default(true),
   walletId: z.string().uuid().optional(),
@@ -173,7 +173,7 @@ export const verifyPayment = createServerFn({ method: "POST" })
 const ChargeSavedInput = z.object({
   authorizationCode: z.string().min(4),
   amount: z.number().positive().max(10_000_000),
-  currency: z.enum(["KES", "USD", "GHS", "NGN", "ZAR"]),
+  currency: z.enum(["KES", "USD", "EUR", "GBP"]),
   email: z.string().email(),
   walletId: z.string().uuid().optional(),
 });
@@ -198,7 +198,7 @@ export const chargeSavedCard = createServerFn({ method: "POST" })
       reference,
       amount: data.amount,
       currency: data.currency,
-      status: "processing",
+      status: "pending",
       authorization_code: card.authorization_code,
       last4: card.last4,
       brand: card.brand,
