@@ -36,13 +36,14 @@ const NAV = [
   { to: "/settings", label: "Settings", icon: Settings },
 ] as const;
 
-const MOBILE_NAV = [
+type MobileNavItem = { to: string; label: string; icon: typeof LayoutDashboard; primary?: boolean };
+const MOBILE_NAV: MobileNavItem[] = [
   { to: "/dashboard", label: "Home", icon: LayoutDashboard },
   { to: "/wallets", label: "Wallets", icon: Wallet },
   { to: "/send", label: "Send", icon: Send, primary: true },
   { to: "/market", label: "Market", icon: TrendingUp },
   { to: "/transactions", label: "Activity", icon: Receipt },
-] as const;
+];
 
 function AppShell() {
   const [mobileOpen, setMobileOpen] = useState(false);
