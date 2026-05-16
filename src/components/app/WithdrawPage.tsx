@@ -24,6 +24,7 @@ import {
   listBanks, resolveAccount, addLinkedBank, setDefaultBank, deleteLinkedBank,
   setTransactionPin, hasTransactionPin, initiateWithdrawal,
 } from "@/lib/transfers.functions";
+import { darajaB2CSend } from "@/lib/daraja.functions";
 
 type WalletRow = { id: string; currency: "KES" | "USD" | "EUR" | "GBP" | "ABAN"; balance: number; wallet_number: string; is_primary: boolean };
 type LinkedBank = {
@@ -43,6 +44,7 @@ export function WithdrawPage() {
   const [method, setMethod] = useState<"bank" | "wallet" | "mpesa">("bank");
   const [walletId, setWalletId] = useState<string>("");
   const [bankId, setBankId] = useState<string>("");
+  const [mpesaPhone, setMpesaPhone] = useState("+254 ");
   const [amount, setAmount] = useState("");
   const [narration, setNarration] = useState("");
   const [pin, setPin] = useState("");
@@ -52,6 +54,7 @@ export function WithdrawPage() {
   const [resultId, setResultId] = useState<string | null>(null);
 
   const initFn = useServerFn(initiateWithdrawal);
+  const b2cFn = useServerFn(darajaB2CSend);
   const hasPinFn = useServerFn(hasTransactionPin);
 
   const { data: wallets } = useQuery({
@@ -119,18 +122,29 @@ export function WithdrawPage() {
   }
 
   async function submit() {
-    if (!wallet || !bank || !amount || pin.length < 4) return;
+    if (!wallet || !amount || pin.length < 4) return;
     if (!pinInfo?.hasPin) { setShowSetPin(true); return; }
     setSubmitting(true);
     try {
-      const idem = crypto.randomUUID();
-      const r = await initFn({ data: {
-        walletId: wallet.id, bankId: bank.id, amount: Number(amount),
-        pin, narration: narration || undefined, idempotencyKey: idem,
-      }});
-      setResultId(r.withdrawalId);
+      if (method === "mpesa") {
+        const r = await b2cFn({ data: {
+          phone: mpesaPhone, amount: Math.round(Number(amount)),
+          walletId: wallet.id, pin,
+          narration: narration || undefined,
+        }});
+        setResultId(r.withdrawalId);
+        toast.success(r.message);
+      } else {
+        if (!bank) return;
+        const idem = crypto.randomUUID();
+        const r = await initFn({ data: {
+          walletId: wallet.id, bankId: bank.id, amount: Number(amount),
+          pin, narration: narration || undefined, idempotencyKey: idem,
+        }});
+        setResultId(r.withdrawalId);
+        toast.success("Withdrawal submitted");
+      }
       qc.invalidateQueries({ queryKey: ["wallets", user?.id] });
-      toast.success("Withdrawal submitted");
     } catch (e) {
       toast.error((e as Error).message);
     } finally { setSubmitting(false); setPin(""); }
@@ -217,7 +231,7 @@ export function WithdrawPage() {
                 <div className="space-y-2">
                   {[
                     { id: "bank", label: "To Bank Account", icon: Building2, fee: "1.5%", time: "Minutes", enabled: true },
-                    { id: "mpesa", label: "To M-Pesa", icon: Smartphone, fee: "1%", time: "Instant", enabled: false },
+                    { id: "mpesa", label: "To M-Pesa", icon: Smartphone, fee: "1%", time: "Instant", enabled: true },
                     { id: "wallet", label: "To AbanRemit Wallet", icon: Wallet, fee: "0%", time: "Instant", enabled: false },
                   ].map((m) => (
                     <button key={m.id} disabled={!m.enabled} onClick={() => setMethod(m.id as typeof method)}
@@ -247,7 +261,7 @@ export function WithdrawPage() {
                   ))}
                 </div>
                 <div className="flex justify-end mt-4">
-                  <Button onClick={() => setStep("beneficiary")} disabled={!walletId} className="gradient-primary glow-primary text-primary-foreground">Continue <ChevronRight className="h-4 w-4 ml-1" /></Button>
+                  <Button onClick={() => setStep(method === "mpesa" ? "amount" : "beneficiary")} disabled={!walletId} className="gradient-primary glow-primary text-primary-foreground">Continue <ChevronRight className="h-4 w-4 ml-1" /></Button>
                 </div>
               </GlassCard>
             </div>
@@ -308,6 +322,12 @@ export function WithdrawPage() {
                   ))}
                   <Button variant="outline" size="sm" onClick={() => setAmount(String(Number(wallet?.balance ?? 0)))}>Max</Button>
                 </div>
+                {method === "mpesa" && (
+                  <div className="space-y-1.5 mb-3">
+                    <Label className="text-xs uppercase tracking-wider text-muted-foreground">M-Pesa phone</Label>
+                    <Input value={mpesaPhone} onChange={(e) => setMpesaPhone(e.target.value)} placeholder="+254 7XX XXX XXX" />
+                  </div>
+                )}
                 <div className="space-y-1.5">
                   <Label className="text-xs uppercase tracking-wider text-muted-foreground">Narration (optional)</Label>
                   <Input value={narration} onChange={(e) => setNarration(e.target.value.slice(0, 120))} placeholder="What's this for?" />
@@ -326,7 +346,7 @@ export function WithdrawPage() {
                 </div>
                 {insufficient && <div className="mt-3 text-xs text-destructive">Insufficient balance for amount + fee.</div>}
                 <div className="flex justify-between mt-6">
-                  <Button variant="ghost" onClick={() => setStep("beneficiary")}><ChevronLeft className="h-4 w-4 mr-1" /> Back</Button>
+                  <Button variant="ghost" onClick={() => setStep(method === "mpesa" ? "method" : "beneficiary")}><ChevronLeft className="h-4 w-4 mr-1" /> Back</Button>
                   <Button onClick={() => setStep("review")} disabled={!amount || Number(amount) <= 0 || insufficient} className="gradient-primary glow-primary text-primary-foreground">Review <ChevronRight className="h-4 w-4 ml-1" /></Button>
                 </div>
               </GlassCard>
@@ -339,9 +359,18 @@ export function WithdrawPage() {
             <GlassCard className="max-w-xl mx-auto">
               <div className="font-display text-lg font-semibold mb-4">Confirm withdrawal</div>
               <div className="rounded-2xl bg-surface-2/40 p-4 space-y-2 mb-4">
-                <Row label="To" value={bank?.account_name ?? ""} />
-                <Row label="Bank" value={bank?.bank_name ?? ""} />
-                <Row label="Account" value={`••••${bank?.account_number.slice(-4) ?? ""}`} />
+                {method === "mpesa" ? (
+                  <>
+                    <Row label="To" value="M-Pesa" />
+                    <Row label="Phone" value={mpesaPhone} />
+                  </>
+                ) : (
+                  <>
+                    <Row label="To" value={bank?.account_name ?? ""} />
+                    <Row label="Bank" value={bank?.bank_name ?? ""} />
+                    <Row label="Account" value={`••••${bank?.account_number.slice(-4) ?? ""}`} />
+                  </>
+                )}
                 <div className="my-2 border-t border-border/40" />
                 <Row label="Amount" value={`${wallet?.currency} ${Number(amount).toLocaleString(undefined, {minimumFractionDigits:2})}`} bold />
                 <Row label="Fee" value={`${wallet?.currency} ${fee.toLocaleString(undefined, {minimumFractionDigits:2})}`} />
