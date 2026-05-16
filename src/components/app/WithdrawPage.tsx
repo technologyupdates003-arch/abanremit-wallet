@@ -359,9 +359,18 @@ export function WithdrawPage() {
             <GlassCard className="max-w-xl mx-auto">
               <div className="font-display text-lg font-semibold mb-4">Confirm withdrawal</div>
               <div className="rounded-2xl bg-surface-2/40 p-4 space-y-2 mb-4">
-                <Row label="To" value={bank?.account_name ?? ""} />
-                <Row label="Bank" value={bank?.bank_name ?? ""} />
-                <Row label="Account" value={`••••${bank?.account_number.slice(-4) ?? ""}`} />
+                {method === "mpesa" ? (
+                  <>
+                    <Row label="To" value="M-Pesa" />
+                    <Row label="Phone" value={mpesaPhone} />
+                  </>
+                ) : (
+                  <>
+                    <Row label="To" value={bank?.account_name ?? ""} />
+                    <Row label="Bank" value={bank?.bank_name ?? ""} />
+                    <Row label="Account" value={`••••${bank?.account_number.slice(-4) ?? ""}`} />
+                  </>
+                )}
                 <div className="my-2 border-t border-border/40" />
                 <Row label="Amount" value={`${wallet?.currency} ${Number(amount).toLocaleString(undefined, {minimumFractionDigits:2})}`} bold />
                 <Row label="Fee" value={`${wallet?.currency} ${fee.toLocaleString(undefined, {minimumFractionDigits:2})}`} />
