@@ -231,7 +231,7 @@ export function WithdrawPage() {
                 <div className="space-y-2">
                   {[
                     { id: "bank", label: "To Bank Account", icon: Building2, fee: "1.5%", time: "Minutes", enabled: true },
-                    { id: "mpesa", label: "To M-Pesa", icon: Smartphone, fee: "1%", time: "Instant", enabled: false },
+                    { id: "mpesa", label: "To M-Pesa", icon: Smartphone, fee: "1%", time: "Instant", enabled: true },
                     { id: "wallet", label: "To AbanRemit Wallet", icon: Wallet, fee: "0%", time: "Instant", enabled: false },
                   ].map((m) => (
                     <button key={m.id} disabled={!m.enabled} onClick={() => setMethod(m.id as typeof method)}
