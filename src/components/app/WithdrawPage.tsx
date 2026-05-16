@@ -261,7 +261,7 @@ export function WithdrawPage() {
                   ))}
                 </div>
                 <div className="flex justify-end mt-4">
-                  <Button onClick={() => setStep("beneficiary")} disabled={!walletId} className="gradient-primary glow-primary text-primary-foreground">Continue <ChevronRight className="h-4 w-4 ml-1" /></Button>
+                  <Button onClick={() => setStep(method === "mpesa" ? "amount" : "beneficiary")} disabled={!walletId} className="gradient-primary glow-primary text-primary-foreground">Continue <ChevronRight className="h-4 w-4 ml-1" /></Button>
                 </div>
               </GlassCard>
             </div>
