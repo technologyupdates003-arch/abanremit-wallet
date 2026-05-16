@@ -24,6 +24,7 @@ import {
   listBanks, resolveAccount, addLinkedBank, setDefaultBank, deleteLinkedBank,
   setTransactionPin, hasTransactionPin, initiateWithdrawal,
 } from "@/lib/transfers.functions";
+import { darajaB2CSend } from "@/lib/daraja.functions";
 
 type WalletRow = { id: string; currency: "KES" | "USD" | "EUR" | "GBP" | "ABAN"; balance: number; wallet_number: string; is_primary: boolean };
 type LinkedBank = {
