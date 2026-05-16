@@ -44,6 +44,7 @@ export function WithdrawPage() {
   const [method, setMethod] = useState<"bank" | "wallet" | "mpesa">("bank");
   const [walletId, setWalletId] = useState<string>("");
   const [bankId, setBankId] = useState<string>("");
+  const [mpesaPhone, setMpesaPhone] = useState("+254 ");
   const [amount, setAmount] = useState("");
   const [narration, setNarration] = useState("");
   const [pin, setPin] = useState("");
@@ -53,6 +54,7 @@ export function WithdrawPage() {
   const [resultId, setResultId] = useState<string | null>(null);
 
   const initFn = useServerFn(initiateWithdrawal);
+  const b2cFn = useServerFn(darajaB2CSend);
   const hasPinFn = useServerFn(hasTransactionPin);
 
   const { data: wallets } = useQuery({
