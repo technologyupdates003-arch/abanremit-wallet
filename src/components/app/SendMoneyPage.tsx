@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { lookupWallet, transferToWallet } from "@/lib/transactions.functions";
+import { darajaB2CSend } from "@/lib/daraja.functions";
 
 export function SendMoneyPage() {
   return (
