@@ -322,6 +322,12 @@ export function WithdrawPage() {
                   ))}
                   <Button variant="outline" size="sm" onClick={() => setAmount(String(Number(wallet?.balance ?? 0)))}>Max</Button>
                 </div>
+                {method === "mpesa" && (
+                  <div className="space-y-1.5 mb-3">
+                    <Label className="text-xs uppercase tracking-wider text-muted-foreground">M-Pesa phone</Label>
+                    <Input value={mpesaPhone} onChange={(e) => setMpesaPhone(e.target.value)} placeholder="+254 7XX XXX XXX" />
+                  </div>
+                )}
                 <div className="space-y-1.5">
                   <Label className="text-xs uppercase tracking-wider text-muted-foreground">Narration (optional)</Label>
                   <Input value={narration} onChange={(e) => setNarration(e.target.value.slice(0, 120))} placeholder="What's this for?" />
