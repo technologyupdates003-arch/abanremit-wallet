@@ -184,15 +184,32 @@ function SendToWallet() {
 }
 
 function SendToPhone() {
-  const send = useSend();
+  const b2c = useServerFn(darajaB2CSend);
   const [phone, setPhone] = useState("+254 ");
   const [amount, setAmount] = useState("");
+  const [narration, setNarration] = useState("");
   const [step, setStep] = useState<"form" | "pin">("form");
-  if (step === "pin") return <PinPad onConfirm={async () => { await send({ type: "send", amount: Number(amount), currency: "KES", metadata: { recipient_phone: phone } }); setStep("form"); }} />;
+  const [submitting, setSubmitting] = useState(false);
+
+  async function onConfirm(pin: string) {
+    setSubmitting(true);
+    try {
+      const res = await b2c({ data: {
+        phone, amount: Math.round(Number(amount)), pin,
+        narration: narration || undefined,
+      }});
+      toast.success(res.message);
+      setStep("form"); setPhone("+254 "); setAmount(""); setNarration("");
+    } catch (e) { toast.error((e as Error).message); }
+    finally { setSubmitting(false); }
+  }
+
+  if (step === "pin") return <PinPad onConfirm={onConfirm} loading={submitting} />;
   return (
     <div className="space-y-3">
-      <FieldRow label="Recipient phone"><Input value={phone} onChange={(e) => setPhone(e.target.value)} /></FieldRow>
+      <FieldRow label="Recipient phone"><Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+254 7XX XXX XXX" /></FieldRow>
       <FieldRow label="Amount (KES)"><Input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} /></FieldRow>
+      <FieldRow label="Note (optional)"><Input value={narration} onChange={(e) => setNarration(e.target.value)} /></FieldRow>
       <Button disabled={!phone || !amount} onClick={() => setStep("pin")} className="w-full h-11 gradient-primary glow-primary text-primary-foreground">Continue</Button>
     </div>
   );
