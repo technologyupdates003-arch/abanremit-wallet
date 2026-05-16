@@ -340,7 +340,7 @@ export function WithdrawPage() {
                 </div>
                 {insufficient && <div className="mt-3 text-xs text-destructive">Insufficient balance for amount + fee.</div>}
                 <div className="flex justify-between mt-6">
-                  <Button variant="ghost" onClick={() => setStep("beneficiary")}><ChevronLeft className="h-4 w-4 mr-1" /> Back</Button>
+                  <Button variant="ghost" onClick={() => setStep(method === "mpesa" ? "method" : "beneficiary")}><ChevronLeft className="h-4 w-4 mr-1" /> Back</Button>
                   <Button onClick={() => setStep("review")} disabled={!amount || Number(amount) <= 0 || insufficient} className="gradient-primary glow-primary text-primary-foreground">Review <ChevronRight className="h-4 w-4 ml-1" /></Button>
                 </div>
               </GlassCard>
