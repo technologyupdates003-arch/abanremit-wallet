@@ -28,6 +28,8 @@ import { Route as AppAdminRouteImport } from './routes/_app/admin'
 import { Route as AppAbanRouteImport } from './routes/_app/aban'
 import { Route as AppAdminIndexRouteImport } from './routes/_app/admin/index'
 import { Route as ApiPublicPaystackWebhookRouteImport } from './routes/api/public/paystack-webhook'
+import { Route as ApiPublicDarajaB2cTimeoutRouteImport } from './routes/api/public/daraja-b2c-timeout'
+import { Route as ApiPublicDarajaB2cResultRouteImport } from './routes/api/public/daraja-b2c-result'
 import { Route as AppAdminWithdrawalsRouteImport } from './routes/_app/admin/withdrawals'
 import { Route as AppAdminWalletsRouteImport } from './routes/_app/admin/wallets'
 import { Route as AppAdminUsersRouteImport } from './routes/_app/admin/users'
@@ -132,6 +134,18 @@ const ApiPublicPaystackWebhookRoute =
     path: '/api/public/paystack-webhook',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicDarajaB2cTimeoutRoute =
+  ApiPublicDarajaB2cTimeoutRouteImport.update({
+    id: '/api/public/daraja-b2c-timeout',
+    path: '/api/public/daraja-b2c-timeout',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicDarajaB2cResultRoute =
+  ApiPublicDarajaB2cResultRouteImport.update({
+    id: '/api/public/daraja-b2c-result',
+    path: '/api/public/daraja-b2c-result',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const AppAdminWithdrawalsRoute = AppAdminWithdrawalsRouteImport.update({
   id: '/withdrawals',
   path: '/withdrawals',
@@ -198,6 +212,8 @@ export interface FileRoutesByFullPath {
   '/admin/users': typeof AppAdminUsersRoute
   '/admin/wallets': typeof AppAdminWalletsRoute
   '/admin/withdrawals': typeof AppAdminWithdrawalsRoute
+  '/api/public/daraja-b2c-result': typeof ApiPublicDarajaB2cResultRoute
+  '/api/public/daraja-b2c-timeout': typeof ApiPublicDarajaB2cTimeoutRoute
   '/api/public/paystack-webhook': typeof ApiPublicPaystackWebhookRoute
   '/admin/': typeof AppAdminIndexRoute
 }
@@ -225,6 +241,8 @@ export interface FileRoutesByTo {
   '/admin/users': typeof AppAdminUsersRoute
   '/admin/wallets': typeof AppAdminWalletsRoute
   '/admin/withdrawals': typeof AppAdminWithdrawalsRoute
+  '/api/public/daraja-b2c-result': typeof ApiPublicDarajaB2cResultRoute
+  '/api/public/daraja-b2c-timeout': typeof ApiPublicDarajaB2cTimeoutRoute
   '/api/public/paystack-webhook': typeof ApiPublicPaystackWebhookRoute
   '/admin': typeof AppAdminIndexRoute
 }
@@ -255,6 +273,8 @@ export interface FileRoutesById {
   '/_app/admin/users': typeof AppAdminUsersRoute
   '/_app/admin/wallets': typeof AppAdminWalletsRoute
   '/_app/admin/withdrawals': typeof AppAdminWithdrawalsRoute
+  '/api/public/daraja-b2c-result': typeof ApiPublicDarajaB2cResultRoute
+  '/api/public/daraja-b2c-timeout': typeof ApiPublicDarajaB2cTimeoutRoute
   '/api/public/paystack-webhook': typeof ApiPublicPaystackWebhookRoute
   '/_app/admin/': typeof AppAdminIndexRoute
 }
@@ -285,6 +305,8 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/admin/wallets'
     | '/admin/withdrawals'
+    | '/api/public/daraja-b2c-result'
+    | '/api/public/daraja-b2c-timeout'
     | '/api/public/paystack-webhook'
     | '/admin/'
   fileRoutesByTo: FileRoutesByTo
@@ -312,6 +334,8 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/admin/wallets'
     | '/admin/withdrawals'
+    | '/api/public/daraja-b2c-result'
+    | '/api/public/daraja-b2c-timeout'
     | '/api/public/paystack-webhook'
     | '/admin'
   id:
@@ -341,6 +365,8 @@ export interface FileRouteTypes {
     | '/_app/admin/users'
     | '/_app/admin/wallets'
     | '/_app/admin/withdrawals'
+    | '/api/public/daraja-b2c-result'
+    | '/api/public/daraja-b2c-timeout'
     | '/api/public/paystack-webhook'
     | '/_app/admin/'
   fileRoutesById: FileRoutesById
@@ -351,6 +377,8 @@ export interface RootRouteChildren {
   ForgotPasswordRoute: typeof ForgotPasswordRoute
   RegisterRoute: typeof RegisterRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
+  ApiPublicDarajaB2cResultRoute: typeof ApiPublicDarajaB2cResultRoute
+  ApiPublicDarajaB2cTimeoutRoute: typeof ApiPublicDarajaB2cTimeoutRoute
   ApiPublicPaystackWebhookRoute: typeof ApiPublicPaystackWebhookRoute
 }
 
@@ -489,6 +517,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicPaystackWebhookRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/daraja-b2c-timeout': {
+      id: '/api/public/daraja-b2c-timeout'
+      path: '/api/public/daraja-b2c-timeout'
+      fullPath: '/api/public/daraja-b2c-timeout'
+      preLoaderRoute: typeof ApiPublicDarajaB2cTimeoutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/daraja-b2c-result': {
+      id: '/api/public/daraja-b2c-result'
+      path: '/api/public/daraja-b2c-result'
+      fullPath: '/api/public/daraja-b2c-result'
+      preLoaderRoute: typeof ApiPublicDarajaB2cResultRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_app/admin/withdrawals': {
       id: '/_app/admin/withdrawals'
       path: '/withdrawals'
@@ -616,8 +658,20 @@ const rootRouteChildren: RootRouteChildren = {
   ForgotPasswordRoute: ForgotPasswordRoute,
   RegisterRoute: RegisterRoute,
   ResetPasswordRoute: ResetPasswordRoute,
+  ApiPublicDarajaB2cResultRoute: ApiPublicDarajaB2cResultRoute,
+  ApiPublicDarajaB2cTimeoutRoute: ApiPublicDarajaB2cTimeoutRoute,
   ApiPublicPaystackWebhookRoute: ApiPublicPaystackWebhookRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
