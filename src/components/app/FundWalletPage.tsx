@@ -8,8 +8,11 @@ import { useAuth } from "@/lib/auth-context";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { QRCodeSVG } from "qrcode.react";
 import { PaystackCardForm } from "./PaystackCardForm";
+import { intasendStkPush } from "@/lib/intasend.functions";
+import { Loader2 } from "lucide-react";
 
 const METHODS = [
   { id: "card", label: "Card Payment", icon: CreditCard, body: "Visa, Mastercard, Amex, Verve via Paystack" },
