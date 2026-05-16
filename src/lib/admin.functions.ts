@@ -185,12 +185,22 @@ export const adminKycQueue = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const { data, error } = await context.supabase
       .from("kyc_documents")
-      .select("*, profiles(full_name, email, phone)")
+      .select("*")
       .eq("status", "pending" as never)
       .order("created_at", { ascending: true })
       .limit(50);
     if (error) throw new Error(error.message);
-    return (data ?? []) as unknown as any[];
+    const rows = (data ?? []) as unknown as any[];
+    const userIds = Array.from(new Set(rows.map(r => r.user_id))).filter(Boolean);
+    let profilesMap: Record<string, any> = {};
+    if (userIds.length) {
+      const { data: profs } = await context.supabase
+        .from("profiles")
+        .select("id, full_name, email, phone")
+        .in("id", userIds);
+      for (const p of (profs ?? []) as any[]) profilesMap[p.id] = p;
+    }
+    return rows.map(r => ({ ...r, profiles: profilesMap[r.user_id] ?? null }));
   });
 
 // =============== TRANSACTIONS ===============
