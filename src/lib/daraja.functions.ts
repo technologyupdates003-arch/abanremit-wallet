@@ -164,10 +164,12 @@ export const darajaB2CSend = createServerFn({ method: "POST" })
         message: "Payout dispatched. You'll be notified when M-Pesa confirms.",
       };
     } catch (e: any) {
-      await context.supabase.rpc("reverse_withdrawal" as never, {
-        _withdrawal_id: wd.id,
-        _reason: e?.message ?? "daraja_request_failed",
-      } as never).catch(() => {});
+      try {
+        await context.supabase.rpc("reverse_withdrawal" as never, {
+          _withdrawal_id: wd.id,
+          _reason: e?.message ?? "daraja_request_failed",
+        } as never);
+      } catch {}
       throw e instanceof Error ? e : new Error(String(e));
     }
   });
