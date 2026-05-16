@@ -8,8 +8,11 @@ import { useAuth } from "@/lib/auth-context";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { QRCodeSVG } from "qrcode.react";
 import { PaystackCardForm } from "./PaystackCardForm";
+import { intasendStkPush } from "@/lib/intasend.functions";
+import { Loader2 } from "lucide-react";
 
 const METHODS = [
   { id: "card", label: "Card Payment", icon: CreditCard, body: "Visa, Mastercard, Amex, Verve via Paystack" },
@@ -133,18 +136,35 @@ function useDeposit() {
 }
 
 function MpesaForm() {
-  const deposit = useDeposit();
+  const stk = useServerFn(intasendStkPush);
   const [phone, setPhone] = useState("+254 ");
   const [amount, setAmount] = useState("1000");
+  const [loading, setLoading] = useState(false);
+
+  async function submit() {
+    const amt = Number(amount);
+    if (!amt || amt <= 0) return toast.error("Enter a valid amount");
+    if (!phone || phone.replace(/\D/g, "").length < 9) return toast.error("Enter a valid phone number");
+    setLoading(true);
+    try {
+      const res = await stk({ data: { phone, amount: amt } });
+      toast.success(res.message);
+    } catch (e: any) {
+      toast.error(e?.message ?? "STK push failed");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
     <GlassCard>
       <div className="font-display text-lg font-semibold mb-4">M-Pesa STK Push</div>
       <div className="space-y-3">
-        <FieldRow label="Phone number"><Input value={phone} onChange={(e) => setPhone(e.target.value)} /></FieldRow>
+        <FieldRow label="Phone number"><Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+254 7XX XXX XXX" /></FieldRow>
         <FieldRow label="Amount (KES)"><Input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} /></FieldRow>
       </div>
-      <Button onClick={() => deposit("mpesa", Number(amount), "KES", { phone })} className="w-full mt-5 h-11 gradient-primary glow-primary text-primary-foreground">
-        Send STK push
+      <Button onClick={submit} disabled={loading} className="w-full mt-5 h-11 gradient-primary glow-primary text-primary-foreground">
+        {loading ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Sending…</> : "Send STK push"}
       </Button>
       <div className="text-[11px] text-muted-foreground mt-3">Powered by IntaSend. You'll receive a prompt on your phone — enter your M-Pesa PIN to complete.</div>
     </GlassCard>
