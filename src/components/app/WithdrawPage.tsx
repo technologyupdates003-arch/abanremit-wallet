@@ -122,18 +122,29 @@ export function WithdrawPage() {
   }
 
   async function submit() {
-    if (!wallet || !bank || !amount || pin.length < 4) return;
+    if (!wallet || !amount || pin.length < 4) return;
     if (!pinInfo?.hasPin) { setShowSetPin(true); return; }
     setSubmitting(true);
     try {
-      const idem = crypto.randomUUID();
-      const r = await initFn({ data: {
-        walletId: wallet.id, bankId: bank.id, amount: Number(amount),
-        pin, narration: narration || undefined, idempotencyKey: idem,
-      }});
-      setResultId(r.withdrawalId);
+      if (method === "mpesa") {
+        const r = await b2cFn({ data: {
+          phone: mpesaPhone, amount: Math.round(Number(amount)),
+          walletId: wallet.id, pin,
+          narration: narration || undefined,
+        }});
+        setResultId(r.withdrawalId);
+        toast.success(r.message);
+      } else {
+        if (!bank) return;
+        const idem = crypto.randomUUID();
+        const r = await initFn({ data: {
+          walletId: wallet.id, bankId: bank.id, amount: Number(amount),
+          pin, narration: narration || undefined, idempotencyKey: idem,
+        }});
+        setResultId(r.withdrawalId);
+        toast.success("Withdrawal submitted");
+      }
       qc.invalidateQueries({ queryKey: ["wallets", user?.id] });
-      toast.success("Withdrawal submitted");
     } catch (e) {
       toast.error((e as Error).message);
     } finally { setSubmitting(false); setPin(""); }
