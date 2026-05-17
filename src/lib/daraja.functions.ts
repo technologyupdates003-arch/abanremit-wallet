@@ -48,10 +48,13 @@ export const darajaB2CSend = createServerFn({ method: "POST" })
   .inputValidator((d: z.input<typeof B2CInput>) => B2CInput.parse(d))
   .handler(async ({ data, context }) => {
     const shortcode = process.env.DARAJA_B2C_SHORTCODE;
-    const initiator = process.env.DARAJA_B2C_INITIATOR_NAME;
+    const initiator = process.env.DARAJA_B2C_INITIATOR_NAME ?? process.env.DARAJA_B2C_INTIATOR_NAME;
     const credential = process.env.DARAJA_B2C_SECURITY_CREDENTIAL;
-    const resultUrl = process.env.DARAJA_B2C_RESULT_URL;
-    const timeoutUrl = process.env.DARAJA_B2C_TIMEOUT_URL;
+    // Fall back to the app's public origin so callbacks land on our route handlers
+    let origin = "";
+    try { origin = new URL(getRequest().url).origin; } catch {}
+    const resultUrl = process.env.DARAJA_B2C_RESULT_URL ?? (origin ? `${origin}/api/public/daraja-b2c-result` : "");
+    const timeoutUrl = process.env.DARAJA_B2C_TIMEOUT_URL ?? (origin ? `${origin}/api/public/daraja-b2c-timeout` : "");
     if (!shortcode || !initiator || !credential || !resultUrl || !timeoutUrl) {
       throw new Error("Daraja B2C configuration incomplete");
     }
