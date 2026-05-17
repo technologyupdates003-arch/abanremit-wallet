@@ -54,6 +54,33 @@ export const Route = createFileRoute("/api/public/daraja-b2c-result")({
             _withdrawal_id: wd.id,
             _gateway_reference: meta.TransactionReceipt ?? conversation ?? null,
           } as never);
+
+          // SMS confirmation
+          try {
+            const [{ data: profile }, { data: wallet }] = await Promise.all([
+              supabaseAdmin.from("profiles").select("phone").eq("id", wd.user_id).maybeSingle(),
+              wd.wallet_id
+                ? supabaseAdmin.from("wallets").select("balance, wallet_number").eq("id", wd.wallet_id).maybeSingle()
+                : Promise.resolve({ data: null } as any),
+            ]);
+            const toPhone = (wd.destination as any)?.phone ?? "";
+            if (profile?.phone && toPhone) {
+              const reference = (meta.TransactionReceipt ?? wd.reference ?? "").toString().slice(-10).toUpperCase();
+              await sendSms(
+                profile.phone,
+                withdrawalConfirmMsg({
+                  reference: reference || "ABNWITHDR",
+                  amount: Number(wd.amount),
+                  toPhone,
+                  walletNumber: wallet?.wallet_number ?? null,
+                  newBalance: wallet?.balance != null ? Number(wallet.balance) : null,
+                  dailyLimitRemaining: 500_000,
+                }),
+              );
+            }
+          } catch (e) {
+            console.error("withdrawal sms failed", e);
+          }
         } else {
           await supabaseAdmin.rpc("reverse_withdrawal" as never, {
             _withdrawal_id: wd.id,
