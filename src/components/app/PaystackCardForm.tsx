@@ -156,34 +156,25 @@ export function PaystackCardForm({
         },
       });
 
-      // Tokenize + charge directly against Paystack /charge — raw card data
-      // never touches our backend. PCI scope stays with Paystack.
+      // Charge on the server with the SECRET key (Paystack /charge rejects
+      // calls authorised with the public key). Card data is sent over HTTPS
+      // to our server fn and immediately forwarded to Paystack — never stored.
       const [mm, yy] = exp.split("/");
-      const chargeRes = await fetch("https://api.paystack.co/charge", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${initRes.publicKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          email: initRes.email,
-          amount: initRes.amountSubunits,
-          currency: initRes.currency,
+      const chargeRes = await charge({
+        data: {
           reference: initRes.reference,
-          card: {
-            number: number.replace(/\s/g, ""),
-            cvv,
-            expiry_month: mm,
-            expiry_year: `20${yy}`,
-          },
-        }),
+          email: initRes.email,
+          amount,
+          currency,
+          number: number.replace(/\s/g, ""),
+          cvv,
+          expiry_month: mm,
+          expiry_year: yy,
+        },
       });
-      const chargeJson = (await chargeRes.json()) as {
-        status: boolean;
-        message: string;
-        data?: { status: string; reference: string; display_text?: string };
-      };
-      if (!chargeJson.status) throw new Error(chargeJson.message || "Card declined");
+      if (chargeRes.status === "failed") {
+        throw new Error(chargeRes.message || "Card declined");
+      }
 
       // Wipe sensitive state immediately
       setNumber("");
