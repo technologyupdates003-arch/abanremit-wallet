@@ -20,7 +20,7 @@ export const intasendStkPush = createServerFn({ method: "POST" })
   .inputValidator((d: z.input<typeof StkInput>) => StkInput.parse(d))
   .handler(async ({ data, context }) => {
     const secret = process.env.INTASEND_SECRET_KEY;
-    const pub = process.env.INTASEND_PUBLIC_KEY;
+    const pub = process.env.INTASEND_PUBLIC_KEY ?? process.env.INTASEND_PUBLISHABLE_KEY;
     const testMode = (process.env.INTASEND_TEST_MODE ?? "false").toLowerCase() === "true";
     if (!secret || !pub) throw new Error("IntaSend credentials not configured");
 

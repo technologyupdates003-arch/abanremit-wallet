@@ -220,6 +220,59 @@ export const chargeSavedCard = createServerFn({ method: "POST" })
     return { reference: r.reference, status: r.status, message: r.gateway_response };
   });
 
+const ChargeNewCardInput = z.object({
+  reference: z.string().min(8).max(128),
+  email: z.string().email(),
+  amount: z.number().positive().max(10_000_000),
+  currency: z.enum(["KES", "USD", "EUR", "GBP"]),
+  number: z.string().min(12).max(19),
+  cvv: z.string().min(3).max(4),
+  expiry_month: z.string().min(1).max(2),
+  expiry_year: z.string().min(2).max(4),
+  pin: z.string().min(4).max(8).optional(),
+  otp: z.string().min(4).max(8).optional(),
+});
+
+// Server-side /charge call (uses SECRET key). Card data never persists.
+export const chargeCard = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: z.input<typeof ChargeNewCardInput>) => ChargeNewCardInput.parse(d))
+  .handler(async ({ data }) => {
+    const key = process.env.PAYSTACK_SECRET_KEY;
+    if (!key) throw new Error("PAYSTACK_SECRET_KEY not configured");
+    const expYear = data.expiry_year.length === 2 ? `20${data.expiry_year}` : data.expiry_year;
+    const body: any = {
+      email: data.email,
+      amount: Math.round(data.amount * 100),
+      currency: data.currency,
+      reference: data.reference,
+      card: {
+        number: data.number.replace(/\s/g, ""),
+        cvv: data.cvv,
+        expiry_month: data.expiry_month,
+        expiry_year: expYear,
+      },
+    };
+    if (data.pin) body.pin = data.pin;
+    if (data.otp) body.otp = data.otp;
+
+    const res = await fetch(`${PAYSTACK_BASE}/charge`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const json: any = await res.json().catch(() => ({}));
+    if (!res.ok || !json?.status) {
+      throw new Error(json?.message || `Charge failed (${res.status})`);
+    }
+    return {
+      status: json?.data?.status as string,
+      reference: json?.data?.reference as string,
+      displayText: json?.data?.display_text as string | undefined,
+      message: json?.message as string,
+    };
+  });
+
 const DeleteCardInput = z.object({ id: z.string().uuid() });
 
 export const deleteSavedCard = createServerFn({ method: "POST" })
