@@ -8,6 +8,8 @@ import { toast } from "sonner";
 import { Loader2, User, Mail, Phone, Globe2, Lock } from "lucide-react";
 import { AuthFooter, AuthLink } from "./AuthShell";
 import { Field } from "./LoginForm";
+import { sendWelcomeSms } from "@/lib/sms.functions";
+import { useServerFn } from "@tanstack/react-start";
 
 const COUNTRIES = ["Kenya", "Uganda", "Tanzania", "Nigeria", "Ghana", "South Africa", "United Kingdom", "United States", "United Arab Emirates", "Other"];
 
