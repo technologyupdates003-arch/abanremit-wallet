@@ -75,6 +75,7 @@ export function PaystackCardForm({
   const verify = useServerFn(verifyPayment);
   const chargeSaved = useServerFn(chargeSavedCard);
   const removeCard = useServerFn(deleteSavedCard);
+  const charge = useServerFn(chargeCard);
 
   const [holder, setHolder] = useState("");
   const [number, setNumber] = useState("");
