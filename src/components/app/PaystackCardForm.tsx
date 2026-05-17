@@ -11,6 +11,7 @@ import {
   verifyPayment,
   chargeSavedCard,
   deleteSavedCard,
+  chargeCard,
 } from "@/lib/paystack.functions";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
