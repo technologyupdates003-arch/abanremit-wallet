@@ -25,6 +25,7 @@ const schema = z.object({
 
 export function RegisterForm() {
   const nav = useNavigate();
+  const sendWelcome = useServerFn(sendWelcomeSms);
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({
     full_name: "", username: "", email: "", phone: "", country: "Kenya", password: "", confirm: "",
@@ -41,7 +42,7 @@ export function RegisterForm() {
     }
     setLoading(true);
     const redirectTo = `${window.location.origin}/dashboard`;
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email: form.email.trim(),
       password: form.password,
       options: {
@@ -54,10 +55,16 @@ export function RegisterForm() {
         },
       },
     });
+    if (error) { setLoading(false); toast.error(error.message); return; }
+
+    // Welcome SMS (best-effort, don't block UX)
+    if (data.session) {
+      sendWelcome({ data: { phone: form.phone.trim(), fullName: form.full_name.trim() } })
+        .catch((e) => console.warn("welcome sms failed", e));
+    }
     setLoading(false);
-    if (error) { toast.error(error.message); return; }
-    toast.success("Check your email to verify your account");
-    nav({ to: "/" });
+    toast.success("Welcome to AbanRemit!");
+    nav({ to: data.session ? "/dashboard" : "/" });
   }
 
   return (
