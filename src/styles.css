@@ -84,19 +84,19 @@
   --muted: oklch(0.22 0.006 20);
   --muted-foreground: oklch(0.68 0.01 20);
 
-  --accent: oklch(0.62 0.24 25);
+  --accent: oklch(0.62 0.20 255);
   --accent-foreground: oklch(0.99 0 0);
 
-  --destructive: oklch(0.62 0.24 25);
+  --destructive: oklch(0.62 0.20 255);
   --destructive-foreground: oklch(0.99 0 0);
   --success: oklch(0.72 0.18 150);
   --warning: oklch(0.78 0.16 80);
 
   --border: oklch(0.28 0.008 20 / 0.6);
   --input: oklch(0.24 0.008 20);
-  --ring: oklch(0.62 0.24 25 / 0.5);
+  --ring: oklch(0.62 0.20 255 / 0.5);
 
-  --chart-1: oklch(0.62 0.24 25);
+  --chart-1: oklch(0.62 0.20 255);
   --chart-2: oklch(0.72 0.18 150);
   --chart-3: oklch(0.78 0.16 80);
   --chart-4: oklch(0.65 0.18 260);
@@ -104,21 +104,21 @@
 
   --sidebar: oklch(0.11 0.004 0);
   --sidebar-foreground: oklch(0.92 0 0);
-  --sidebar-primary: oklch(0.62 0.24 25);
+  --sidebar-primary: oklch(0.62 0.20 255);
   --sidebar-primary-foreground: oklch(0.99 0 0);
   --sidebar-accent: oklch(0.2 0.008 20);
   --sidebar-accent-foreground: oklch(0.98 0 0);
   --sidebar-border: oklch(0.22 0.008 20 / 0.7);
-  --sidebar-ring: oklch(0.62 0.24 25 / 0.5);
+  --sidebar-ring: oklch(0.62 0.20 255 / 0.5);
 
   /* Effects */
-  --gradient-primary: linear-gradient(135deg, oklch(0.62 0.24 25), oklch(0.5 0.22 18));
-  --gradient-glow: radial-gradient(60% 60% at 50% 0%, oklch(0.62 0.24 25 / 0.45), transparent 70%);
+  --gradient-primary: linear-gradient(135deg, oklch(0.62 0.20 255), oklch(0.5 0.20 260));
+  --gradient-glow: radial-gradient(60% 60% at 50% 0%, oklch(0.62 0.20 255 / 0.45), transparent 70%);
   --gradient-card: linear-gradient(180deg, oklch(0.2 0.008 20 / 0.9), oklch(0.14 0.005 0 / 0.9));
-  --gradient-mesh: radial-gradient(800px circle at 0% 0%, oklch(0.62 0.24 25 / 0.18), transparent 50%),
-                   radial-gradient(600px circle at 100% 100%, oklch(0.5 0.22 18 / 0.12), transparent 60%);
+  --gradient-mesh: radial-gradient(800px circle at 0% 0%, oklch(0.62 0.20 255 / 0.18), transparent 50%),
+                   radial-gradient(600px circle at 100% 100%, oklch(0.5 0.20 260 / 0.12), transparent 60%);
   --shadow-elevated: 0 30px 80px -20px oklch(0 0 0 / 0.7), 0 0 0 1px oklch(1 0 0 / 0.04);
-  --shadow-glow: 0 0 60px -10px oklch(0.62 0.24 25 / 0.5);
+  --shadow-glow: 0 0 60px -10px oklch(0.62 0.20 255 / 0.5);
   --glass: oklch(1 0 0 / 0.04);
   --glass-border: oklch(1 0 0 / 0.08);
 }
@@ -161,7 +161,7 @@
   .gradient-primary { background: var(--gradient-primary); }
   .glow-primary { box-shadow: var(--shadow-glow); }
   .text-gradient {
-    background: linear-gradient(135deg, oklch(1 0 0), oklch(0.78 0.06 25));
+    background: linear-gradient(135deg, oklch(1 0 0), oklch(0.78 0.06 255));
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
