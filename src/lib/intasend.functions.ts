@@ -19,8 +19,8 @@ export const intasendStkPush = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: z.input<typeof StkInput>) => StkInput.parse(d))
   .handler(async ({ data, context }) => {
-    const secret = process.env.INTASEND_SECRET_KEY;
-    const pub = process.env.INTASEND_PUBLISHABLE_KEY ?? process.env.INTASEND_PUBLIC_KEY;
+    const secret = process.env.INTASEND_SECRET_KEY?.trim();
+    const pub = (process.env.INTASEND_PUBLISHABLE_KEY ?? process.env.INTASEND_PUBLIC_KEY)?.trim();
     const testMode = (process.env.INTASEND_TEST_MODE ?? "false").toLowerCase() === "true";
     if (!secret || !pub) throw new Error("IntaSend credentials not configured");
 
@@ -88,7 +88,12 @@ export const intasendStkPush = createServerFn({ method: "POST" })
         json?.errors?.[0]?.message ||
         (typeof json?.errors === "object" ? Object.values(json.errors).flat().join(" ") : null);
       console.error("IntaSend STK push failed", { status: res.status, apiRef, phone, response: json });
-      throw new Error(gatewayMessage ? `IntaSend: ${gatewayMessage}` : `IntaSend STK push failed (${res.status})`);
+      return {
+        ok: false,
+        depositId: dep.id,
+        apiRef,
+        message: gatewayMessage ? `IntaSend: ${gatewayMessage}` : `IntaSend STK push failed (${res.status})`,
+      };
     }
 
     return {
