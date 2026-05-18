@@ -64,6 +64,7 @@ export const intasendStkPush = createServerFn({ method: "POST" })
       headers: {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${secret}`,
+        "INTASEND_PUBLIC_API_KEY": pub,
       },
       body: JSON.stringify({
         public_key: pub,
