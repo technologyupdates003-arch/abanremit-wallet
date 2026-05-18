@@ -20,11 +20,11 @@ export const intasendStkPush = createServerFn({ method: "POST" })
   .inputValidator((d: z.input<typeof StkInput>) => StkInput.parse(d))
   .handler(async ({ data, context }) => {
     const secret = process.env.INTASEND_SECRET_KEY;
-    const pub = process.env.INTASEND_PUBLIC_KEY ?? process.env.INTASEND_PUBLISHABLE_KEY;
+    const pub = process.env.INTASEND_PUBLISHABLE_KEY ?? process.env.INTASEND_PUBLIC_KEY;
     const testMode = (process.env.INTASEND_TEST_MODE ?? "false").toLowerCase() === "true";
     if (!secret || !pub) throw new Error("IntaSend credentials not configured");
 
-    const base = testMode ? "https://sandbox.intasend.com" : "https://payment.intasend.com";
+    const base = process.env.INTASEND_BASE_URL ?? (testMode ? "https://sandbox.intasend.com" : "https://api.intasend.com");
     const phone = normalizePhone(data.phone);
 
     // Create a pending deposit row for reconciliation
@@ -44,7 +44,7 @@ export const intasendStkPush = createServerFn({ method: "POST" })
       .single();
     if (depErr) throw new Error(depErr.message);
 
-    const res = await fetch(`${base}/api/v1/payment/mpesa-stk-push/`, {
+    const res = await fetch(`${base.replace(/\/$/, "")}/api/v1/payment/mpesa-stk-push/`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -53,9 +53,10 @@ export const intasendStkPush = createServerFn({ method: "POST" })
       body: JSON.stringify({
         public_key: pub,
         phone_number: phone,
-        amount: data.amount,
+        amount: data.amount.toFixed(2),
         api_ref: apiRef,
         currency: "KES",
+        host: process.env.APP_URL ?? "https://aban-nova-nexus.lovable.app",
       }),
     });
 
@@ -65,7 +66,14 @@ export const intasendStkPush = createServerFn({ method: "POST" })
         .from("deposits")
         .update({ status: "failed" as never, metadata: { error: json, phone, gateway: "intasend" } as never })
         .eq("id", dep.id);
-      throw new Error(json?.detail || json?.errors?.[0]?.detail || "IntaSend STK push failed");
+      const gatewayMessage =
+        json?.detail ||
+        json?.message ||
+        json?.errors?.[0]?.detail ||
+        json?.errors?.[0]?.message ||
+        (typeof json?.errors === "object" ? Object.values(json.errors).flat().join(" ") : null);
+      console.error("IntaSend STK push failed", { status: res.status, apiRef, phone, response: json });
+      throw new Error(gatewayMessage ? `IntaSend: ${gatewayMessage}` : `IntaSend STK push failed (${res.status})`);
     }
 
     return {
