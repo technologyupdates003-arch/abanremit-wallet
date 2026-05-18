@@ -148,7 +148,8 @@ function MpesaForm() {
     setLoading(true);
     try {
       const res = await stk({ data: { phone, amount: amt } });
-      toast.success(res.message);
+      if (res.ok) toast.success(res.message);
+      else toast.error(res.message);
     } catch (e: any) {
       toast.error(e?.message ?? "STK push failed");
     } finally {
