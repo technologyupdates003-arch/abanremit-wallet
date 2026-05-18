@@ -24,7 +24,22 @@ export const intasendStkPush = createServerFn({ method: "POST" })
     const testMode = (process.env.INTASEND_TEST_MODE ?? "false").toLowerCase() === "true";
     if (!secret || !pub) throw new Error("IntaSend credentials not configured");
 
-    const base = process.env.INTASEND_BASE_URL ?? (testMode ? "https://sandbox.intasend.com" : "https://api.intasend.com");
+    // Validate key format to catch swapped/mismatched keys early
+    const secretIsLive = secret.startsWith("ISSecretKey_live_");
+    const secretIsTest = secret.startsWith("ISSecretKey_test_");
+    const pubIsLive = pub.startsWith("ISPubKey_live_");
+    const pubIsTest = pub.startsWith("ISPubKey_test_");
+    if (!secretIsLive && !secretIsTest) {
+      throw new Error("INTASEND_SECRET_KEY must start with ISSecretKey_live_ or ISSecretKey_test_. Check you set the SECRET key (not the publishable key).");
+    }
+    if (!pubIsLive && !pubIsTest) {
+      throw new Error("INTASEND_PUBLISHABLE_KEY must start with ISPubKey_live_ or ISPubKey_test_.");
+    }
+    if (secretIsLive !== pubIsLive) {
+      throw new Error("IntaSend key mismatch: secret and publishable keys must both be LIVE or both be TEST.");
+    }
+    const useTest = testMode || secretIsTest;
+    const base = process.env.INTASEND_BASE_URL ?? (useTest ? "https://sandbox.intasend.com" : "https://payment.intasend.com");
     const phone = normalizePhone(data.phone);
 
     // Create a pending deposit row for reconciliation
