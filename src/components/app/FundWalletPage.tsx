@@ -11,12 +11,12 @@ import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { QRCodeSVG } from "qrcode.react";
 import { PaystackCardForm } from "./PaystackCardForm";
-import { intasendStkPush } from "@/lib/intasend.functions";
+import { darajaStkPush } from "@/lib/daraja.functions";
 import { Loader2 } from "lucide-react";
 
 const METHODS = [
   { id: "card", label: "Card Payment", icon: CreditCard, body: "Visa, Mastercard, Amex, Verve via Paystack" },
-  { id: "mpesa", label: "M-Pesa STK Push", icon: Smartphone, body: "IntaSend instant mobile money" },
+  { id: "mpesa", label: "M-Pesa STK Push", icon: Smartphone, body: "Lipa Na M-Pesa — instant" },
   { id: "btc", label: "Bitcoin", icon: Bitcoin, body: "On-chain BTC deposit" },
   { id: "bank", label: "Bank Transfer", icon: Building2, body: "Local & international rails" },
 ] as const;
@@ -136,13 +136,13 @@ function useDeposit() {
 }
 
 function MpesaForm() {
-  const stk = useServerFn(intasendStkPush);
+  const stk = useServerFn(darajaStkPush);
   const [phone, setPhone] = useState("+254 ");
   const [amount, setAmount] = useState("1000");
   const [loading, setLoading] = useState(false);
 
   async function submit() {
-    const amt = Number(amount);
+    const amt = Math.floor(Number(amount));
     if (!amt || amt <= 0) return toast.error("Enter a valid amount");
     if (!phone || phone.replace(/\D/g, "").length < 9) return toast.error("Enter a valid phone number");
     setLoading(true);
@@ -167,7 +167,7 @@ function MpesaForm() {
       <Button onClick={submit} disabled={loading} className="w-full mt-5 h-11 gradient-primary glow-primary text-primary-foreground">
         {loading ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Sending…</> : "Send STK push"}
       </Button>
-      <div className="text-[11px] text-muted-foreground mt-3">Powered by IntaSend. You'll receive a prompt on your phone — enter your M-Pesa PIN to complete.</div>
+      <div className="text-[11px] text-muted-foreground mt-3">Powered by Safaricom Daraja. You'll receive an M-Pesa prompt on your phone — enter your PIN to complete the deposit. Your wallet updates in real time once confirmed.</div>
     </GlassCard>
   );
 }

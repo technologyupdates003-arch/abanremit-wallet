@@ -28,7 +28,7 @@ import { Route as AppAdminRouteImport } from './routes/_app/admin'
 import { Route as AppAbanRouteImport } from './routes/_app/aban'
 import { Route as AppAdminIndexRouteImport } from './routes/_app/admin/index'
 import { Route as ApiPublicPaystackWebhookRouteImport } from './routes/api/public/paystack-webhook'
-import { Route as ApiPublicIntasendWebhookRouteImport } from './routes/api/public/intasend-webhook'
+import { Route as ApiPublicDarajaStkCallbackRouteImport } from './routes/api/public/daraja-stk-callback'
 import { Route as ApiPublicDarajaB2cTimeoutRouteImport } from './routes/api/public/daraja-b2c-timeout'
 import { Route as ApiPublicDarajaB2cResultRouteImport } from './routes/api/public/daraja-b2c-result'
 import { Route as AppAdminWithdrawalsRouteImport } from './routes/_app/admin/withdrawals'
@@ -135,10 +135,10 @@ const ApiPublicPaystackWebhookRoute =
     path: '/api/public/paystack-webhook',
     getParentRoute: () => rootRouteImport,
   } as any)
-const ApiPublicIntasendWebhookRoute =
-  ApiPublicIntasendWebhookRouteImport.update({
-    id: '/api/public/intasend-webhook',
-    path: '/api/public/intasend-webhook',
+const ApiPublicDarajaStkCallbackRoute =
+  ApiPublicDarajaStkCallbackRouteImport.update({
+    id: '/api/public/daraja-stk-callback',
+    path: '/api/public/daraja-stk-callback',
     getParentRoute: () => rootRouteImport,
   } as any)
 const ApiPublicDarajaB2cTimeoutRoute =
@@ -221,7 +221,7 @@ export interface FileRoutesByFullPath {
   '/admin/withdrawals': typeof AppAdminWithdrawalsRoute
   '/api/public/daraja-b2c-result': typeof ApiPublicDarajaB2cResultRoute
   '/api/public/daraja-b2c-timeout': typeof ApiPublicDarajaB2cTimeoutRoute
-  '/api/public/intasend-webhook': typeof ApiPublicIntasendWebhookRoute
+  '/api/public/daraja-stk-callback': typeof ApiPublicDarajaStkCallbackRoute
   '/api/public/paystack-webhook': typeof ApiPublicPaystackWebhookRoute
   '/admin/': typeof AppAdminIndexRoute
 }
@@ -251,7 +251,7 @@ export interface FileRoutesByTo {
   '/admin/withdrawals': typeof AppAdminWithdrawalsRoute
   '/api/public/daraja-b2c-result': typeof ApiPublicDarajaB2cResultRoute
   '/api/public/daraja-b2c-timeout': typeof ApiPublicDarajaB2cTimeoutRoute
-  '/api/public/intasend-webhook': typeof ApiPublicIntasendWebhookRoute
+  '/api/public/daraja-stk-callback': typeof ApiPublicDarajaStkCallbackRoute
   '/api/public/paystack-webhook': typeof ApiPublicPaystackWebhookRoute
   '/admin': typeof AppAdminIndexRoute
 }
@@ -284,7 +284,7 @@ export interface FileRoutesById {
   '/_app/admin/withdrawals': typeof AppAdminWithdrawalsRoute
   '/api/public/daraja-b2c-result': typeof ApiPublicDarajaB2cResultRoute
   '/api/public/daraja-b2c-timeout': typeof ApiPublicDarajaB2cTimeoutRoute
-  '/api/public/intasend-webhook': typeof ApiPublicIntasendWebhookRoute
+  '/api/public/daraja-stk-callback': typeof ApiPublicDarajaStkCallbackRoute
   '/api/public/paystack-webhook': typeof ApiPublicPaystackWebhookRoute
   '/_app/admin/': typeof AppAdminIndexRoute
 }
@@ -317,7 +317,7 @@ export interface FileRouteTypes {
     | '/admin/withdrawals'
     | '/api/public/daraja-b2c-result'
     | '/api/public/daraja-b2c-timeout'
-    | '/api/public/intasend-webhook'
+    | '/api/public/daraja-stk-callback'
     | '/api/public/paystack-webhook'
     | '/admin/'
   fileRoutesByTo: FileRoutesByTo
@@ -347,7 +347,7 @@ export interface FileRouteTypes {
     | '/admin/withdrawals'
     | '/api/public/daraja-b2c-result'
     | '/api/public/daraja-b2c-timeout'
-    | '/api/public/intasend-webhook'
+    | '/api/public/daraja-stk-callback'
     | '/api/public/paystack-webhook'
     | '/admin'
   id:
@@ -379,7 +379,7 @@ export interface FileRouteTypes {
     | '/_app/admin/withdrawals'
     | '/api/public/daraja-b2c-result'
     | '/api/public/daraja-b2c-timeout'
-    | '/api/public/intasend-webhook'
+    | '/api/public/daraja-stk-callback'
     | '/api/public/paystack-webhook'
     | '/_app/admin/'
   fileRoutesById: FileRoutesById
@@ -392,7 +392,7 @@ export interface RootRouteChildren {
   ResetPasswordRoute: typeof ResetPasswordRoute
   ApiPublicDarajaB2cResultRoute: typeof ApiPublicDarajaB2cResultRoute
   ApiPublicDarajaB2cTimeoutRoute: typeof ApiPublicDarajaB2cTimeoutRoute
-  ApiPublicIntasendWebhookRoute: typeof ApiPublicIntasendWebhookRoute
+  ApiPublicDarajaStkCallbackRoute: typeof ApiPublicDarajaStkCallbackRoute
   ApiPublicPaystackWebhookRoute: typeof ApiPublicPaystackWebhookRoute
 }
 
@@ -531,11 +531,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicPaystackWebhookRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/intasend-webhook': {
-      id: '/api/public/intasend-webhook'
-      path: '/api/public/intasend-webhook'
-      fullPath: '/api/public/intasend-webhook'
-      preLoaderRoute: typeof ApiPublicIntasendWebhookRouteImport
+    '/api/public/daraja-stk-callback': {
+      id: '/api/public/daraja-stk-callback'
+      path: '/api/public/daraja-stk-callback'
+      fullPath: '/api/public/daraja-stk-callback'
+      preLoaderRoute: typeof ApiPublicDarajaStkCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/daraja-b2c-timeout': {
@@ -681,19 +681,9 @@ const rootRouteChildren: RootRouteChildren = {
   ResetPasswordRoute: ResetPasswordRoute,
   ApiPublicDarajaB2cResultRoute: ApiPublicDarajaB2cResultRoute,
   ApiPublicDarajaB2cTimeoutRoute: ApiPublicDarajaB2cTimeoutRoute,
-  ApiPublicIntasendWebhookRoute: ApiPublicIntasendWebhookRoute,
+  ApiPublicDarajaStkCallbackRoute: ApiPublicDarajaStkCallbackRoute,
   ApiPublicPaystackWebhookRoute: ApiPublicPaystackWebhookRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
