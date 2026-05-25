@@ -9,6 +9,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { useAuth } from "@/lib/auth-context";
+import { useServerFn } from "@tanstack/react-start";
+import { setTransactionPin } from "@/lib/transfers.functions";
 
 export function SettingsPage() {
   return (
@@ -59,17 +61,24 @@ function ChangePassword() {
 }
 
 function TransactionPin() {
-  const { user } = useAuth();
   const [pin, setPin] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [saving, setSaving] = useState(false);
+  const setPinFn = useServerFn(setTransactionPin);
   async function save() {
     if (pin.length !== 4) return toast.error("Enter a 4-digit PIN");
-    // Hash client-side preview; production should hash server-side
-    const enc = new TextEncoder().encode(pin + user!.id);
-    const buf = await crypto.subtle.digest("SHA-256", enc);
-    const hash = Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join("");
-    const { error } = await supabase.from("profiles").update({ transaction_pin_hash: hash }).eq("id", user!.id);
-    if (error) return toast.error(error.message);
-    toast.success("Transaction PIN set"); setPin("");
+    if (pin !== confirm) return toast.error("PINs do not match");
+    setSaving(true);
+    try {
+      await setPinFn({ data: { pin } });
+      toast.success("Transaction PIN set");
+      setPin("");
+      setConfirm("");
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setSaving(false);
+    }
   }
   return (
     <Section icon={Smartphone} title="Transaction PIN">
@@ -78,7 +87,11 @@ function TransactionPin() {
         <InputOTP maxLength={4} value={pin} onChange={setPin}>
           <InputOTPGroup>{[0,1,2,3].map((i) => <InputOTPSlot key={i} index={i} className="bg-surface-2 border-border h-12 w-12" />)}</InputOTPGroup>
         </InputOTP>
-        <Button onClick={save} className="gradient-primary text-primary-foreground">Save PIN</Button>
+        <Label className="text-xs uppercase tracking-wider text-muted-foreground">Confirm PIN</Label>
+        <InputOTP maxLength={4} value={confirm} onChange={setConfirm}>
+          <InputOTPGroup>{[0,1,2,3].map((i) => <InputOTPSlot key={i} index={i} className="bg-surface-2 border-border h-12 w-12" />)}</InputOTPGroup>
+        </InputOTP>
+        <Button disabled={saving || pin.length < 4 || confirm.length < 4} onClick={save} className="gradient-primary text-primary-foreground">Save PIN</Button>
       </div>
     </Section>
   );
