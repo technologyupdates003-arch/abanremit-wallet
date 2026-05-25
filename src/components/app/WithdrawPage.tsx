@@ -25,6 +25,7 @@ import {
   setTransactionPin, hasTransactionPin, initiateWithdrawal,
 } from "@/lib/transfers.functions";
 import { darajaB2CSend } from "@/lib/daraja.functions";
+import { lookupWallet, transferToWallet } from "@/lib/transactions.functions";
 
 type WalletRow = { id: string; currency: "KES" | "USD" | "EUR" | "GBP" | "ABAN"; balance: number; wallet_number: string; is_primary: boolean };
 type LinkedBank = {
@@ -43,6 +44,10 @@ export function WithdrawPage() {
   const [step, setStep] = useState<Step>("method");
   const [method, setMethod] = useState<"bank" | "wallet" | "mpesa">("bank");
   const [walletId, setWalletId] = useState<string>("");
+  const [recipientWalletNumber, setRecipientWalletNumber] = useState("");
+  const [walletRecipient, setWalletRecipient] = useState<{ fullName: string; phone?: string | null; currency: string; walletId: string } | null>(null);
+  const [lookingUpWallet, setLookingUpWallet] = useState(false);
+  const [walletExchange, setWalletExchange] = useState<{ rate: number; destinationAmount: number } | null>(null);
   const [bankId, setBankId] = useState<string>("");
   const [mpesaPhone, setMpesaPhone] = useState("+254 ");
   const [amount, setAmount] = useState("");
@@ -56,6 +61,8 @@ export function WithdrawPage() {
   const initFn = useServerFn(initiateWithdrawal);
   const b2cFn = useServerFn(darajaB2CSend);
   const hasPinFn = useServerFn(hasTransactionPin);
+  const lookupWalletFn = useServerFn(lookupWallet);
+  const transferWalletFn = useServerFn(transferToWallet);
 
   const { data: wallets } = useQuery({
     queryKey: ["wallets", user?.id],
@@ -86,10 +93,45 @@ export function WithdrawPage() {
   useEffect(() => { if (!walletId && wallet) setWalletId(wallet.id); }, [wallet, walletId]);
   useEffect(() => { if (!bankId && bank) setBankId(bank.id); }, [bank, bankId]);
 
-  const fee = Number(amount || 0) * 0.015;
+  const feeRate = method === "bank" ? 0.015 : method === "mpesa" ? 0.01 : 0;
+  const fee = Math.round(Number(amount || 0) * feeRate * 100) / 100;
   const receive = Math.max(0, Number(amount || 0));
   const total = Number(amount || 0) + fee;
   const insufficient = wallet ? total > Number(wallet.balance) : false;
+
+  useEffect(() => {
+    if (method !== "wallet" || recipientWalletNumber.length < 6) { setWalletRecipient(null); return; }
+    let cancelled = false;
+    setLookingUpWallet(true);
+    const t = setTimeout(async () => {
+      try {
+        const r = await lookupWalletFn({ data: { walletNumber: recipientWalletNumber.trim() } });
+        if (!cancelled) setWalletRecipient(r.found ? { fullName: r.fullName, phone: r.phone, currency: r.currency, walletId: r.walletId } : null);
+      } catch { if (!cancelled) setWalletRecipient(null); }
+      finally { if (!cancelled) setLookingUpWallet(false); }
+    }, 350);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [method, recipientWalletNumber, lookupWalletFn]);
+
+  useEffect(() => {
+    if (method !== "wallet" || !walletRecipient || !wallet || walletRecipient.currency === wallet.currency || Number(amount) <= 0) { setWalletExchange(null); return; }
+    let cancelled = false;
+    const t = setTimeout(async () => {
+      const { data } = await supabase
+        .from("exchange_rates")
+        .select("rate, spread")
+        .eq("from_currency", wallet.currency as never)
+        .eq("to_currency", walletRecipient.currency as never)
+        .maybeSingle();
+      if (cancelled) return;
+      if (!data) setWalletExchange(null);
+      else {
+        const rate = Number(data.rate) * (1 - Number(data.spread ?? 0));
+        setWalletExchange({ rate, destinationAmount: Number((Number(amount) * rate).toFixed(4)) });
+      }
+    }, 250);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [method, walletRecipient, wallet, amount]);
 
   // Realtime: subscribe to current withdrawal row
   useEffect(() => {
@@ -126,7 +168,19 @@ export function WithdrawPage() {
     if (!pinInfo?.hasPin) { setShowSetPin(true); return; }
     setSubmitting(true);
     try {
-      if (method === "mpesa") {
+      if (method === "wallet") {
+        if (!walletRecipient) return;
+        const r = await transferWalletFn({ data: {
+          fromWalletId: wallet.id,
+          toWalletNumber: recipientWalletNumber.trim(),
+          amount: Number(amount),
+          pin,
+          narration: narration || undefined,
+          idempotencyKey: crypto.randomUUID(),
+        }});
+        toast.success(`Wallet transfer complete · ${r.reference}`);
+        reset();
+      } else if (method === "mpesa") {
         const r = await b2cFn({ data: {
           phone: mpesaPhone, amount: Math.round(Number(amount)),
           walletId: wallet.id, pin,
