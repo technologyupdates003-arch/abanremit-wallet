@@ -99,10 +99,11 @@ function SendToWallet() {
   const [amount, setAmount] = useState("");
   const [desc, setDesc] = useState("");
   const [step, setStep] = useState<"form" | "pin" | "done">("form");
-  const [recipient, setRecipient] = useState<{ fullName: string; currency: string; walletId: string } | null>(null);
+  const [recipient, setRecipient] = useState<{ fullName: string; currency: string; walletId: string; phone?: string | null } | null>(null);
+  const [exchange, setExchange] = useState<{ rate: number; destinationAmount: number } | null>(null);
   const [lookingUp, setLookingUp] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [result, setResult] = useState<{ reference: string } | null>(null);
+  const [result, setResult] = useState<{ reference: string; destinationAmount?: number; destinationCurrency?: string } | null>(null);
 
   useEffect(() => { if (!fromId && wallets[0]) setFromId(wallets[0].id); }, [wallets, fromId]);
   const fromWallet = wallets.find((w) => w.id === fromId);
@@ -114,12 +115,32 @@ function SendToWallet() {
     const t = setTimeout(async () => {
       try {
         const r = await lookup({ data: { walletNumber: walletNum.trim() } });
-        if (!cancelled) setRecipient(r.found ? { fullName: r.fullName, currency: r.currency, walletId: r.walletId } : null);
+        if (!cancelled) setRecipient(r.found ? { fullName: r.fullName, currency: r.currency, walletId: r.walletId, phone: r.phone } : null);
       } catch { if (!cancelled) setRecipient(null); }
       finally { if (!cancelled) setLookingUp(false); }
     }, 350);
     return () => { cancelled = true; clearTimeout(t); };
   }, [walletNum, lookup]);
+
+  useEffect(() => {
+    if (!recipient || !fromWallet || recipient.currency === fromWallet.currency || Number(amount) <= 0) { setExchange(null); return; }
+    let cancelled = false;
+    const t = setTimeout(async () => {
+      const { data } = await supabase
+        .from("exchange_rates")
+        .select("rate, spread")
+        .eq("from_currency", fromWallet.currency as never)
+        .eq("to_currency", recipient.currency as never)
+        .maybeSingle();
+      if (cancelled) return;
+      if (!data) setExchange(null);
+      else {
+        const rate = Number(data.rate) * (1 - Number(data.spread ?? 0));
+        setExchange({ rate, destinationAmount: Number((Number(amount) * rate).toFixed(4)) });
+      }
+    }, 250);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [recipient, fromWallet, amount]);
 
   if (step === "done" && result) {
     return (
@@ -143,7 +164,7 @@ function SendToWallet() {
           amount: Number(amount), narration: desc || undefined,
           pin, idempotencyKey: crypto.randomUUID(),
         }});
-        setResult({ reference: r.reference });
+        setResult({ reference: r.reference, destinationAmount: r.destination_amount, destinationCurrency: r.destination_currency });
         setStep("done");
         qc.invalidateQueries();
         toast.success("Transfer settled");
@@ -154,7 +175,8 @@ function SendToWallet() {
   }
 
   const currencyMismatch = recipient && fromWallet && recipient.currency !== fromWallet.currency;
-  const canContinue = !!fromWallet && !!recipient && !currencyMismatch && Number(amount) > 0 && Number(amount) <= Number(fromWallet?.balance ?? 0);
+  const needsRate = !!currencyMismatch && Number(amount) > 0;
+  const canContinue = !!fromWallet && !!recipient && (!needsRate || !!exchange) && Number(amount) > 0 && Number(amount) <= Number(fromWallet?.balance ?? 0);
 
   return (
     <div className="space-y-3">
@@ -168,8 +190,10 @@ function SendToWallet() {
       </FieldRow>
       {lookingUp && <div className="text-xs text-muted-foreground flex items-center gap-2"><Loader2 className="h-3 w-3 animate-spin" /> Verifying recipient…</div>}
       {recipient && (
-        <div className={`text-xs rounded-md px-3 py-2 ${currencyMismatch ? "bg-destructive/10 text-destructive" : "bg-success/10 text-success"}`}>
-          {currencyMismatch ? `Currency mismatch — recipient holds ${recipient.currency}` : `Sending to ${recipient.fullName} (${recipient.currency})`}
+        <div className="text-xs rounded-md px-3 py-2 bg-success/10 text-success space-y-1">
+          <div>Sending to {recipient.fullName} · {recipient.currency}</div>
+          {recipient.phone && <div className="text-muted-foreground">Phone {recipient.phone}</div>}
+          {currencyMismatch && exchange && <div>Exchange: 1 {fromWallet.currency} ≈ {exchange.rate.toLocaleString(undefined, { maximumFractionDigits: 6 })} {recipient.currency}</div>}
         </div>
       )}
       {walletNum.length >= 6 && !lookingUp && !recipient && (
@@ -178,6 +202,11 @@ function SendToWallet() {
       <FieldRow label={`Amount${fromWallet ? ` (${fromWallet.currency})` : ""}`}>
         <Input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} />
       </FieldRow>
+      {currencyMismatch && Number(amount) > 0 && (
+        <div className="text-xs rounded-md px-3 py-2 bg-primary/10 text-primary">
+          {exchange ? `Recipient receives about ${exchange.destinationAmount.toLocaleString()} ${recipient.currency}` : `No exchange rate found for ${fromWallet.currency} → ${recipient.currency}`}
+        </div>
+      )}
       <FieldRow label="Description (optional)"><Input value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="Rent, gift, payment…" /></FieldRow>
       <Button disabled={!canContinue} onClick={() => setStep("pin")} className="w-full h-11 gradient-primary glow-primary text-primary-foreground">Continue</Button>
     </div>
