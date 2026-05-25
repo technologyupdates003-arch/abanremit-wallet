@@ -402,6 +402,11 @@ export function WithdrawPage() {
                     <Input value={mpesaPhone} onChange={(e) => setMpesaPhone(e.target.value)} placeholder="+254 7XX XXX XXX" />
                   </div>
                 )}
+                {method === "wallet" && walletRecipient && wallet && walletRecipient.currency !== wallet.currency && Number(amount) > 0 && (
+                  <div className="rounded-xl bg-primary/10 text-primary p-3 text-xs mb-3">
+                    {walletExchange ? `Exchange: ${wallet.currency} ${Number(amount).toLocaleString()} → ${walletRecipient.currency} ${walletExchange.destinationAmount.toLocaleString()} at ${walletExchange.rate.toLocaleString(undefined, { maximumFractionDigits: 6 })}` : `No exchange rate found for ${wallet.currency} → ${walletRecipient.currency}`}
+                  </div>
+                )}
                 <div className="space-y-1.5">
                   <Label className="text-xs uppercase tracking-wider text-muted-foreground">Narration (optional)</Label>
                   <Input value={narration} onChange={(e) => setNarration(e.target.value.slice(0, 120))} placeholder="What's this for?" />
@@ -411,17 +416,17 @@ export function WithdrawPage() {
                 <div className="font-display text-lg font-semibold mb-4">Summary</div>
                 <Row label="Available" value={`${wallet?.currency} ${Number(wallet?.balance ?? 0).toLocaleString(undefined, {minimumFractionDigits:2})}`} />
                 <Row label="You send" value={`${wallet?.currency} ${Number(amount || 0).toLocaleString(undefined, {minimumFractionDigits:2})}`} />
-                <Row label="Fee (1.5%)" value={`${wallet?.currency} ${fee.toLocaleString(undefined, {minimumFractionDigits:2})}`} />
+                <Row label={`Fee (${(feeRate * 100).toLocaleString()}%)`} value={`${wallet?.currency} ${fee.toLocaleString(undefined, {minimumFractionDigits:2})}`} />
                 <div className="my-2 border-t border-border/40" />
                 <Row label="Total debit" value={`${wallet?.currency} ${total.toLocaleString(undefined, {minimumFractionDigits:2})}`} bold />
-                <Row label="Recipient gets" value={`${wallet?.currency} ${receive.toLocaleString(undefined, {minimumFractionDigits:2})}`} />
+                <Row label="Recipient gets" value={method === "wallet" && walletRecipient && walletRecipient.currency !== wallet?.currency && walletExchange ? `${walletRecipient.currency} ${walletExchange.destinationAmount.toLocaleString(undefined, {minimumFractionDigits:2})}` : `${wallet?.currency} ${receive.toLocaleString(undefined, {minimumFractionDigits:2})}`} />
                 <div className="mt-4 flex items-center gap-2 text-xs text-muted-foreground">
                   <Clock className="h-3 w-3" /> Estimated arrival: 1-3 minutes
                 </div>
                 {insufficient && <div className="mt-3 text-xs text-destructive">Insufficient balance for amount + fee.</div>}
                 <div className="flex justify-between mt-6">
                   <Button variant="ghost" onClick={() => setStep(method === "mpesa" ? "method" : "beneficiary")}><ChevronLeft className="h-4 w-4 mr-1" /> Back</Button>
-                  <Button onClick={() => setStep("review")} disabled={!amount || Number(amount) <= 0 || insufficient} className="gradient-primary glow-primary text-primary-foreground">Review <ChevronRight className="h-4 w-4 ml-1" /></Button>
+                  <Button onClick={() => setStep("review")} disabled={!amount || Number(amount) <= 0 || insufficient || (method === "wallet" && walletRecipient?.currency !== wallet?.currency && !walletExchange)} className="gradient-primary glow-primary text-primary-foreground">Review <ChevronRight className="h-4 w-4 ml-1" /></Button>
                 </div>
               </GlassCard>
             </div>
