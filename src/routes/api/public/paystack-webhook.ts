@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { createHmac, timingSafeEqual } from "crypto";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { depositConfirmMsg, sendSms } from "@/lib/talksasa.server";
 
 type PaystackEvent = {
   event: string;
@@ -67,7 +68,7 @@ export const Route = createFileRoute("/api/public/paystack-webhook")({
           const ref = payload.data.reference;
           const { data: pay } = await supabaseAdmin
             .from("payment_transactions")
-            .select("id, user_id, status")
+            .select("id, user_id, status, amount, currency, wallet_id, reference")
             .eq("reference", ref)
             .maybeSingle();
 
@@ -90,6 +91,25 @@ export const Route = createFileRoute("/api/public/paystack-webhook")({
                   }
                 : null,
             });
+
+            try {
+              const [{ data: profile }, { data: wallet }] = await Promise.all([
+                supabaseAdmin.from("profiles").select("phone").eq("id", pay.user_id).maybeSingle(),
+                pay.wallet_id
+                  ? supabaseAdmin.from("wallets").select("wallet_number, balance").eq("id", pay.wallet_id).maybeSingle()
+                  : Promise.resolve({ data: null } as any),
+              ]);
+              if (profile?.phone) {
+                await sendSms(profile.phone, depositConfirmMsg({
+                  reference: String(pay.reference ?? ref).slice(-10).toUpperCase(),
+                  amount: Number(pay.amount),
+                  walletNumber: wallet?.wallet_number ?? null,
+                  newBalance: wallet?.balance != null ? Number(wallet.balance) : null,
+                }));
+              }
+            } catch (e) {
+              console.error("card deposit sms failed", e);
+            }
 
             if (auth?.reusable && payload.data.customer?.customer_code) {
               await supabaseAdmin.from("saved_cards").upsert(

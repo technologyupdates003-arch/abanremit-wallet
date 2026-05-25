@@ -25,6 +25,7 @@ import {
   setTransactionPin, hasTransactionPin, initiateWithdrawal,
 } from "@/lib/transfers.functions";
 import { darajaB2CSend } from "@/lib/daraja.functions";
+import { lookupWallet, transferToWallet } from "@/lib/transactions.functions";
 
 type WalletRow = { id: string; currency: "KES" | "USD" | "EUR" | "GBP" | "ABAN"; balance: number; wallet_number: string; is_primary: boolean };
 type LinkedBank = {
@@ -43,6 +44,10 @@ export function WithdrawPage() {
   const [step, setStep] = useState<Step>("method");
   const [method, setMethod] = useState<"bank" | "wallet" | "mpesa">("bank");
   const [walletId, setWalletId] = useState<string>("");
+  const [recipientWalletNumber, setRecipientWalletNumber] = useState("");
+  const [walletRecipient, setWalletRecipient] = useState<{ fullName: string; phone?: string | null; currency: string; walletId: string } | null>(null);
+  const [lookingUpWallet, setLookingUpWallet] = useState(false);
+  const [walletExchange, setWalletExchange] = useState<{ rate: number; destinationAmount: number } | null>(null);
   const [bankId, setBankId] = useState<string>("");
   const [mpesaPhone, setMpesaPhone] = useState("+254 ");
   const [amount, setAmount] = useState("");
@@ -56,6 +61,8 @@ export function WithdrawPage() {
   const initFn = useServerFn(initiateWithdrawal);
   const b2cFn = useServerFn(darajaB2CSend);
   const hasPinFn = useServerFn(hasTransactionPin);
+  const lookupWalletFn = useServerFn(lookupWallet);
+  const transferWalletFn = useServerFn(transferToWallet);
 
   const { data: wallets } = useQuery({
     queryKey: ["wallets", user?.id],
@@ -86,10 +93,45 @@ export function WithdrawPage() {
   useEffect(() => { if (!walletId && wallet) setWalletId(wallet.id); }, [wallet, walletId]);
   useEffect(() => { if (!bankId && bank) setBankId(bank.id); }, [bank, bankId]);
 
-  const fee = Number(amount || 0) * 0.015;
+  const feeRate = method === "bank" ? 0.015 : method === "mpesa" ? 0.01 : 0;
+  const fee = Math.round(Number(amount || 0) * feeRate * 100) / 100;
   const receive = Math.max(0, Number(amount || 0));
   const total = Number(amount || 0) + fee;
   const insufficient = wallet ? total > Number(wallet.balance) : false;
+
+  useEffect(() => {
+    if (method !== "wallet" || recipientWalletNumber.length < 6) { setWalletRecipient(null); return; }
+    let cancelled = false;
+    setLookingUpWallet(true);
+    const t = setTimeout(async () => {
+      try {
+        const r = await lookupWalletFn({ data: { walletNumber: recipientWalletNumber.trim() } });
+        if (!cancelled) setWalletRecipient(r.found ? { fullName: r.fullName, phone: r.phone, currency: r.currency, walletId: r.walletId } : null);
+      } catch { if (!cancelled) setWalletRecipient(null); }
+      finally { if (!cancelled) setLookingUpWallet(false); }
+    }, 350);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [method, recipientWalletNumber, lookupWalletFn]);
+
+  useEffect(() => {
+    if (method !== "wallet" || !walletRecipient || !wallet || walletRecipient.currency === wallet.currency || Number(amount) <= 0) { setWalletExchange(null); return; }
+    let cancelled = false;
+    const t = setTimeout(async () => {
+      const { data } = await supabase
+        .from("exchange_rates")
+        .select("rate, spread")
+        .eq("from_currency", wallet.currency as never)
+        .eq("to_currency", walletRecipient.currency as never)
+        .maybeSingle();
+      if (cancelled) return;
+      if (!data) setWalletExchange(null);
+      else {
+        const rate = Number(data.rate) * (1 - Number(data.spread ?? 0));
+        setWalletExchange({ rate, destinationAmount: Number((Number(amount) * rate).toFixed(4)) });
+      }
+    }, 250);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [method, walletRecipient, wallet, amount]);
 
   // Realtime: subscribe to current withdrawal row
   useEffect(() => {
@@ -118,7 +160,7 @@ export function WithdrawPage() {
   });
 
   function reset() {
-    setResultId(null); setStep("method"); setAmount(""); setPin(""); setNarration("");
+    setResultId(null); setStep("method"); setAmount(""); setPin(""); setNarration(""); setRecipientWalletNumber(""); setWalletRecipient(null);
   }
 
   async function submit() {
@@ -126,7 +168,19 @@ export function WithdrawPage() {
     if (!pinInfo?.hasPin) { setShowSetPin(true); return; }
     setSubmitting(true);
     try {
-      if (method === "mpesa") {
+      if (method === "wallet") {
+        if (!walletRecipient) return;
+        const r = await transferWalletFn({ data: {
+          fromWalletId: wallet.id,
+          toWalletNumber: recipientWalletNumber.trim(),
+          amount: Number(amount),
+          pin,
+          narration: narration || undefined,
+          idempotencyKey: crypto.randomUUID(),
+        }});
+        toast.success(`Wallet transfer complete · ${r.reference}`);
+        reset();
+      } else if (method === "mpesa") {
         const r = await b2cFn({ data: {
           phone: mpesaPhone, amount: Math.round(Number(amount)),
           walletId: wallet.id, pin,
@@ -232,7 +286,7 @@ export function WithdrawPage() {
                   {[
                     { id: "bank", label: "To Bank Account", icon: Building2, fee: "1.5%", time: "Minutes", enabled: true },
                     { id: "mpesa", label: "To M-Pesa", icon: Smartphone, fee: "1%", time: "Instant", enabled: true },
-                    { id: "wallet", label: "To AbanRemit Wallet", icon: Wallet, fee: "0%", time: "Instant", enabled: false },
+                    { id: "wallet", label: "To AbanRemit Wallet", icon: Wallet, fee: "0%", time: "Instant", enabled: true },
                   ].map((m) => (
                     <button key={m.id} disabled={!m.enabled} onClick={() => setMethod(m.id as typeof method)}
                       className={`w-full text-left flex items-center gap-3 p-3 rounded-xl transition ${method === m.id ? "bg-primary/10 ring-1 ring-primary/40" : "hover:bg-surface-2/60"} ${!m.enabled ? "opacity-50 cursor-not-allowed" : ""}`}>
@@ -270,37 +324,57 @@ export function WithdrawPage() {
 
         {step === "beneficiary" && (
           <motion.div key="b" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>
-            <GlassCard>
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <div className="font-display text-lg font-semibold">Beneficiary bank</div>
-                  <div className="text-xs text-muted-foreground">Choose a saved bank or add a new one.</div>
-                </div>
-                <Button variant="outline" size="sm" onClick={() => setShowAddBank(true)}><Plus className="h-4 w-4 mr-1" /> Add bank</Button>
-              </div>
-              <div className="space-y-2">
-                {(banks ?? []).length === 0 && (
-                  <div className="text-center py-8 text-sm text-muted-foreground">No saved banks yet. Add one to continue.</div>
-                )}
-                {banks?.map((b) => (
-                  <div key={b.id} className={`flex items-center gap-3 p-3 rounded-xl ${bankId === b.id ? "bg-primary/10 ring-1 ring-primary/40" : "hover:bg-surface-2/60"}`}>
-                    <button onClick={() => setBankId(b.id)} className="flex-1 text-left flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-xl bg-surface-2 flex items-center justify-center text-xs font-semibold">{b.bank_name.slice(0, 2).toUpperCase()}</div>
-                      <div className="flex-1">
-                        <div className="text-sm font-medium flex items-center gap-2">{b.account_name} {b.is_default && <Star className="h-3 w-3 fill-primary text-primary" />}</div>
-                        <div className="text-xs text-muted-foreground font-mono">{b.bank_name} · ••••{b.account_number.slice(-4)}</div>
+              <GlassCard>
+                {method === "wallet" ? (
+                  <>
+                    <div className="font-display text-lg font-semibold mb-1">Recipient wallet</div>
+                    <div className="text-xs text-muted-foreground mb-4">Enter the wallet number to verify the owner before sending.</div>
+                    <div className="space-y-3">
+                      <Input value={recipientWalletNumber} onChange={(e) => setRecipientWalletNumber(e.target.value.toUpperCase())} placeholder="ABN-KES-123456" />
+                      {lookingUpWallet && <div className="text-xs text-muted-foreground flex items-center gap-2"><Loader2 className="h-3 w-3 animate-spin" /> Verifying wallet…</div>}
+                      {walletRecipient && (
+                        <div className="rounded-xl bg-success/10 text-success p-3 text-sm space-y-1">
+                          <div className="font-medium">{walletRecipient.fullName}</div>
+                          <div className="text-xs text-muted-foreground">{walletRecipient.currency} wallet{walletRecipient.phone ? ` · ${walletRecipient.phone}` : ""}</div>
+                        </div>
+                      )}
+                      {recipientWalletNumber.length >= 6 && !lookingUpWallet && !walletRecipient && <div className="text-xs text-destructive">Wallet not found.</div>}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex items-center justify-between mb-4">
+                      <div>
+                        <div className="font-display text-lg font-semibold">Beneficiary bank</div>
+                        <div className="text-xs text-muted-foreground">Choose a saved bank or add a new one.</div>
                       </div>
-                    </button>
-                    {!b.is_default && (
-                      <Button variant="ghost" size="icon" onClick={async () => { await setDefaultBank({ data: { id: b.id }}); refetchBanks(); }}><Star className="h-4 w-4" /></Button>
-                    )}
-                    <Button variant="ghost" size="icon" onClick={async () => { if (confirm("Remove this bank?")) { await deleteLinkedBank({ data: { id: b.id }}); refetchBanks(); }}}><Trash2 className="h-4 w-4 text-destructive" /></Button>
-                  </div>
-                ))}
-              </div>
+                      <Button variant="outline" size="sm" onClick={() => setShowAddBank(true)}><Plus className="h-4 w-4 mr-1" /> Add bank</Button>
+                    </div>
+                    <div className="space-y-2">
+                      {(banks ?? []).length === 0 && (
+                        <div className="text-center py-8 text-sm text-muted-foreground">No saved banks yet. Add one to continue.</div>
+                      )}
+                      {banks?.map((b) => (
+                        <div key={b.id} className={`flex items-center gap-3 p-3 rounded-xl ${bankId === b.id ? "bg-primary/10 ring-1 ring-primary/40" : "hover:bg-surface-2/60"}`}>
+                          <button onClick={() => setBankId(b.id)} className="flex-1 text-left flex items-center gap-3">
+                            <div className="h-10 w-10 rounded-xl bg-surface-2 flex items-center justify-center text-xs font-semibold">{b.bank_name.slice(0, 2).toUpperCase()}</div>
+                            <div className="flex-1">
+                              <div className="text-sm font-medium flex items-center gap-2">{b.account_name} {b.is_default && <Star className="h-3 w-3 fill-primary text-primary" />}</div>
+                              <div className="text-xs text-muted-foreground font-mono">{b.bank_name} · ••••{b.account_number.slice(-4)}</div>
+                            </div>
+                          </button>
+                          {!b.is_default && (
+                            <Button variant="ghost" size="icon" onClick={async () => { await setDefaultBank({ data: { id: b.id }}); refetchBanks(); }}><Star className="h-4 w-4" /></Button>
+                          )}
+                          <Button variant="ghost" size="icon" onClick={async () => { if (confirm("Remove this bank?")) { await deleteLinkedBank({ data: { id: b.id }}); refetchBanks(); }}}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
               <div className="flex justify-between mt-6">
                 <Button variant="ghost" onClick={() => setStep("method")}><ChevronLeft className="h-4 w-4 mr-1" /> Back</Button>
-                <Button onClick={() => setStep("amount")} disabled={!bankId} className="gradient-primary glow-primary text-primary-foreground">Continue <ChevronRight className="h-4 w-4 ml-1" /></Button>
+                  <Button onClick={() => setStep("amount")} disabled={method === "wallet" ? !walletRecipient : !bankId} className="gradient-primary glow-primary text-primary-foreground">Continue <ChevronRight className="h-4 w-4 ml-1" /></Button>
               </div>
             </GlassCard>
           </motion.div>
@@ -328,6 +402,11 @@ export function WithdrawPage() {
                     <Input value={mpesaPhone} onChange={(e) => setMpesaPhone(e.target.value)} placeholder="+254 7XX XXX XXX" />
                   </div>
                 )}
+                {method === "wallet" && walletRecipient && wallet && walletRecipient.currency !== wallet.currency && Number(amount) > 0 && (
+                  <div className="rounded-xl bg-primary/10 text-primary p-3 text-xs mb-3">
+                    {walletExchange ? `Exchange: ${wallet.currency} ${Number(amount).toLocaleString()} → ${walletRecipient.currency} ${walletExchange.destinationAmount.toLocaleString()} at ${walletExchange.rate.toLocaleString(undefined, { maximumFractionDigits: 6 })}` : `No exchange rate found for ${wallet.currency} → ${walletRecipient.currency}`}
+                  </div>
+                )}
                 <div className="space-y-1.5">
                   <Label className="text-xs uppercase tracking-wider text-muted-foreground">Narration (optional)</Label>
                   <Input value={narration} onChange={(e) => setNarration(e.target.value.slice(0, 120))} placeholder="What's this for?" />
@@ -337,17 +416,17 @@ export function WithdrawPage() {
                 <div className="font-display text-lg font-semibold mb-4">Summary</div>
                 <Row label="Available" value={`${wallet?.currency} ${Number(wallet?.balance ?? 0).toLocaleString(undefined, {minimumFractionDigits:2})}`} />
                 <Row label="You send" value={`${wallet?.currency} ${Number(amount || 0).toLocaleString(undefined, {minimumFractionDigits:2})}`} />
-                <Row label="Fee (1.5%)" value={`${wallet?.currency} ${fee.toLocaleString(undefined, {minimumFractionDigits:2})}`} />
+                <Row label={`Fee (${(feeRate * 100).toLocaleString()}%)`} value={`${wallet?.currency} ${fee.toLocaleString(undefined, {minimumFractionDigits:2})}`} />
                 <div className="my-2 border-t border-border/40" />
                 <Row label="Total debit" value={`${wallet?.currency} ${total.toLocaleString(undefined, {minimumFractionDigits:2})}`} bold />
-                <Row label="Recipient gets" value={`${wallet?.currency} ${receive.toLocaleString(undefined, {minimumFractionDigits:2})}`} />
+                <Row label="Recipient gets" value={method === "wallet" && walletRecipient && walletRecipient.currency !== wallet?.currency && walletExchange ? `${walletRecipient.currency} ${walletExchange.destinationAmount.toLocaleString(undefined, {minimumFractionDigits:2})}` : `${wallet?.currency} ${receive.toLocaleString(undefined, {minimumFractionDigits:2})}`} />
                 <div className="mt-4 flex items-center gap-2 text-xs text-muted-foreground">
                   <Clock className="h-3 w-3" /> Estimated arrival: 1-3 minutes
                 </div>
                 {insufficient && <div className="mt-3 text-xs text-destructive">Insufficient balance for amount + fee.</div>}
                 <div className="flex justify-between mt-6">
                   <Button variant="ghost" onClick={() => setStep(method === "mpesa" ? "method" : "beneficiary")}><ChevronLeft className="h-4 w-4 mr-1" /> Back</Button>
-                  <Button onClick={() => setStep("review")} disabled={!amount || Number(amount) <= 0 || insufficient} className="gradient-primary glow-primary text-primary-foreground">Review <ChevronRight className="h-4 w-4 ml-1" /></Button>
+                  <Button onClick={() => setStep("review")} disabled={!amount || Number(amount) <= 0 || insufficient || (method === "wallet" && walletRecipient?.currency !== wallet?.currency && !walletExchange)} className="gradient-primary glow-primary text-primary-foreground">Review <ChevronRight className="h-4 w-4 ml-1" /></Button>
                 </div>
               </GlassCard>
             </div>
@@ -364,6 +443,13 @@ export function WithdrawPage() {
                     <Row label="To" value="M-Pesa" />
                     <Row label="Phone" value={mpesaPhone} />
                   </>
+                ) : method === "wallet" ? (
+                  <>
+                    <Row label="To" value={walletRecipient?.fullName ?? "Wallet"} />
+                    <Row label="Wallet" value={recipientWalletNumber} />
+                    <Row label="Phone" value={walletRecipient?.phone ?? "—"} />
+                    <Row label="Recipient currency" value={walletRecipient?.currency ?? ""} />
+                  </>
                 ) : (
                   <>
                     <Row label="To" value={bank?.account_name ?? ""} />
@@ -375,6 +461,9 @@ export function WithdrawPage() {
                 <Row label="Amount" value={`${wallet?.currency} ${Number(amount).toLocaleString(undefined, {minimumFractionDigits:2})}`} bold />
                 <Row label="Fee" value={`${wallet?.currency} ${fee.toLocaleString(undefined, {minimumFractionDigits:2})}`} />
                 <Row label="Total" value={`${wallet?.currency} ${total.toLocaleString(undefined, {minimumFractionDigits:2})}`} bold />
+                {method === "wallet" && walletRecipient && walletRecipient.currency !== wallet?.currency && walletExchange && (
+                  <Row label="Recipient gets" value={`${walletRecipient.currency} ${walletExchange.destinationAmount.toLocaleString(undefined, {minimumFractionDigits:2})}`} bold />
+                )}
               </div>
               <div className="space-y-2">
                 <Label className="text-xs uppercase tracking-wider text-muted-foreground flex items-center gap-1.5"><Lock className="h-3 w-3" /> Transaction PIN</Label>

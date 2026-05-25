@@ -1144,6 +1144,7 @@ export type Database = {
         Returns: {
           currency: Database["public"]["Enums"]["wallet_currency"]
           full_name: string
+          phone: string
           status: Database["public"]["Enums"]["wallet_status"]
           wallet_id: string
           wallet_user_id: string

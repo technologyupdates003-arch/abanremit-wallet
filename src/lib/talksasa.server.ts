@@ -14,6 +14,10 @@ function fmtKes(n: number) {
   return `KES ${Number(n).toLocaleString("en-KE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+function fmtMoney(amount: number, currency = "KES") {
+  return `${currency} ${Number(amount).toLocaleString("en-KE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
 function shortDateTime(d = new Date()) {
   const pad = (x: number) => String(x).padStart(2, "0");
   const day = pad(d.getDate());
@@ -111,4 +115,36 @@ export function sendReceiveTransferMsg(opts: {
   const when = shortDateTime();
   const bal = opts.newBalance != null ? ` New AbanRemit balance is ${fmtKes(opts.newBalance)}.` : "";
   return `${opts.reference} Confirmed. ${fmtKes(opts.amount)} sent to ${normalizeMsisdn(opts.toPhone)} on ${when}.${bal}`;
+}
+
+export function walletTransferSentMsg(opts: {
+  reference: string;
+  amount: number;
+  currency: string;
+  recipientName?: string | null;
+  recipientWallet?: string | null;
+  destinationAmount?: number | null;
+  destinationCurrency?: string | null;
+  newBalance?: number | null;
+}) {
+  const when = shortDateTime();
+  const who = opts.recipientName || opts.recipientWallet || "wallet";
+  const converted = opts.destinationCurrency && opts.destinationAmount != null && opts.destinationCurrency !== opts.currency
+    ? ` Recipient gets ${fmtMoney(opts.destinationAmount, opts.destinationCurrency)}.`
+    : "";
+  const bal = opts.newBalance != null ? ` New balance is ${fmtMoney(opts.newBalance, opts.currency)}.` : "";
+  return `${opts.reference} Confirmed. ${fmtMoney(opts.amount, opts.currency)} sent to ${who} on ${when}.${converted}${bal} Thank you for using AbanRemit.`;
+}
+
+export function walletTransferReceivedMsg(opts: {
+  reference: string;
+  amount: number;
+  currency: string;
+  senderName?: string | null;
+  newBalance?: number | null;
+}) {
+  const when = shortDateTime();
+  const from = opts.senderName ? ` from ${opts.senderName}` : "";
+  const bal = opts.newBalance != null ? ` New balance is ${fmtMoney(opts.newBalance, opts.currency)}.` : "";
+  return `${opts.reference} Confirmed. You have received ${fmtMoney(opts.amount, opts.currency)}${from} on ${when}.${bal} Thank you for using AbanRemit.`;
 }

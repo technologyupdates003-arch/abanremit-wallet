@@ -187,10 +187,11 @@ export const darajaB2CSend = createServerFn({ method: "POST" })
     if (pinErr) throw new Error(pinErr.message);
 
     let walletId = data.walletId;
+    let walletCurrency: string | null = null;
     if (!walletId) {
       const { data: w } = await context.supabase
         .from("wallets")
-        .select("id")
+        .select("id, currency")
         .eq("user_id", context.userId)
         .eq("currency", "KES" as never)
         .order("is_primary", { ascending: false })
@@ -198,7 +199,18 @@ export const darajaB2CSend = createServerFn({ method: "POST" })
         .maybeSingle();
       if (!w) throw new Error("KES wallet not found");
       walletId = w.id;
+      walletCurrency = w.currency;
+    } else {
+      const { data: w } = await context.supabase
+        .from("wallets")
+        .select("id, currency")
+        .eq("id", walletId)
+        .eq("user_id", context.userId)
+        .maybeSingle();
+      if (!w) throw new Error("Wallet not found");
+      walletCurrency = w.currency;
     }
+    if (walletCurrency !== "KES") throw new Error("M-Pesa withdrawals must use a KES wallet");
 
     const phone = normalizePhone(data.phone);
     const reference = `MPB2C-${Date.now()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
@@ -208,6 +220,7 @@ export const darajaB2CSend = createServerFn({ method: "POST" })
       .from("withdrawals")
       .insert({
         user_id: context.userId,
+        wallet_id: walletId,
         method: "mpesa",
         amount: data.amount,
         currency: "KES" as never,
