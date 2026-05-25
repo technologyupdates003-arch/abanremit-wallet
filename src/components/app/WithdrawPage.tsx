@@ -160,7 +160,7 @@ export function WithdrawPage() {
   });
 
   function reset() {
-    setResultId(null); setStep("method"); setAmount(""); setPin(""); setNarration("");
+    setResultId(null); setStep("method"); setAmount(""); setPin(""); setNarration(""); setRecipientWalletNumber(""); setWalletRecipient(null);
   }
 
   async function submit() {
@@ -286,7 +286,7 @@ export function WithdrawPage() {
                   {[
                     { id: "bank", label: "To Bank Account", icon: Building2, fee: "1.5%", time: "Minutes", enabled: true },
                     { id: "mpesa", label: "To M-Pesa", icon: Smartphone, fee: "1%", time: "Instant", enabled: true },
-                    { id: "wallet", label: "To AbanRemit Wallet", icon: Wallet, fee: "0%", time: "Instant", enabled: false },
+                    { id: "wallet", label: "To AbanRemit Wallet", icon: Wallet, fee: "0%", time: "Instant", enabled: true },
                   ].map((m) => (
                     <button key={m.id} disabled={!m.enabled} onClick={() => setMethod(m.id as typeof method)}
                       className={`w-full text-left flex items-center gap-3 p-3 rounded-xl transition ${method === m.id ? "bg-primary/10 ring-1 ring-primary/40" : "hover:bg-surface-2/60"} ${!m.enabled ? "opacity-50 cursor-not-allowed" : ""}`}>
@@ -324,37 +324,57 @@ export function WithdrawPage() {
 
         {step === "beneficiary" && (
           <motion.div key="b" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>
-            <GlassCard>
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <div className="font-display text-lg font-semibold">Beneficiary bank</div>
-                  <div className="text-xs text-muted-foreground">Choose a saved bank or add a new one.</div>
-                </div>
-                <Button variant="outline" size="sm" onClick={() => setShowAddBank(true)}><Plus className="h-4 w-4 mr-1" /> Add bank</Button>
-              </div>
-              <div className="space-y-2">
-                {(banks ?? []).length === 0 && (
-                  <div className="text-center py-8 text-sm text-muted-foreground">No saved banks yet. Add one to continue.</div>
-                )}
-                {banks?.map((b) => (
-                  <div key={b.id} className={`flex items-center gap-3 p-3 rounded-xl ${bankId === b.id ? "bg-primary/10 ring-1 ring-primary/40" : "hover:bg-surface-2/60"}`}>
-                    <button onClick={() => setBankId(b.id)} className="flex-1 text-left flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-xl bg-surface-2 flex items-center justify-center text-xs font-semibold">{b.bank_name.slice(0, 2).toUpperCase()}</div>
-                      <div className="flex-1">
-                        <div className="text-sm font-medium flex items-center gap-2">{b.account_name} {b.is_default && <Star className="h-3 w-3 fill-primary text-primary" />}</div>
-                        <div className="text-xs text-muted-foreground font-mono">{b.bank_name} · ••••{b.account_number.slice(-4)}</div>
+              <GlassCard>
+                {method === "wallet" ? (
+                  <>
+                    <div className="font-display text-lg font-semibold mb-1">Recipient wallet</div>
+                    <div className="text-xs text-muted-foreground mb-4">Enter the wallet number to verify the owner before sending.</div>
+                    <div className="space-y-3">
+                      <Input value={recipientWalletNumber} onChange={(e) => setRecipientWalletNumber(e.target.value.toUpperCase())} placeholder="ABN-KES-123456" />
+                      {lookingUpWallet && <div className="text-xs text-muted-foreground flex items-center gap-2"><Loader2 className="h-3 w-3 animate-spin" /> Verifying wallet…</div>}
+                      {walletRecipient && (
+                        <div className="rounded-xl bg-success/10 text-success p-3 text-sm space-y-1">
+                          <div className="font-medium">{walletRecipient.fullName}</div>
+                          <div className="text-xs text-muted-foreground">{walletRecipient.currency} wallet{walletRecipient.phone ? ` · ${walletRecipient.phone}` : ""}</div>
+                        </div>
+                      )}
+                      {recipientWalletNumber.length >= 6 && !lookingUpWallet && !walletRecipient && <div className="text-xs text-destructive">Wallet not found.</div>}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex items-center justify-between mb-4">
+                      <div>
+                        <div className="font-display text-lg font-semibold">Beneficiary bank</div>
+                        <div className="text-xs text-muted-foreground">Choose a saved bank or add a new one.</div>
                       </div>
-                    </button>
-                    {!b.is_default && (
-                      <Button variant="ghost" size="icon" onClick={async () => { await setDefaultBank({ data: { id: b.id }}); refetchBanks(); }}><Star className="h-4 w-4" /></Button>
-                    )}
-                    <Button variant="ghost" size="icon" onClick={async () => { if (confirm("Remove this bank?")) { await deleteLinkedBank({ data: { id: b.id }}); refetchBanks(); }}}><Trash2 className="h-4 w-4 text-destructive" /></Button>
-                  </div>
-                ))}
-              </div>
+                      <Button variant="outline" size="sm" onClick={() => setShowAddBank(true)}><Plus className="h-4 w-4 mr-1" /> Add bank</Button>
+                    </div>
+                    <div className="space-y-2">
+                      {(banks ?? []).length === 0 && (
+                        <div className="text-center py-8 text-sm text-muted-foreground">No saved banks yet. Add one to continue.</div>
+                      )}
+                      {banks?.map((b) => (
+                        <div key={b.id} className={`flex items-center gap-3 p-3 rounded-xl ${bankId === b.id ? "bg-primary/10 ring-1 ring-primary/40" : "hover:bg-surface-2/60"}`}>
+                          <button onClick={() => setBankId(b.id)} className="flex-1 text-left flex items-center gap-3">
+                            <div className="h-10 w-10 rounded-xl bg-surface-2 flex items-center justify-center text-xs font-semibold">{b.bank_name.slice(0, 2).toUpperCase()}</div>
+                            <div className="flex-1">
+                              <div className="text-sm font-medium flex items-center gap-2">{b.account_name} {b.is_default && <Star className="h-3 w-3 fill-primary text-primary" />}</div>
+                              <div className="text-xs text-muted-foreground font-mono">{b.bank_name} · ••••{b.account_number.slice(-4)}</div>
+                            </div>
+                          </button>
+                          {!b.is_default && (
+                            <Button variant="ghost" size="icon" onClick={async () => { await setDefaultBank({ data: { id: b.id }}); refetchBanks(); }}><Star className="h-4 w-4" /></Button>
+                          )}
+                          <Button variant="ghost" size="icon" onClick={async () => { if (confirm("Remove this bank?")) { await deleteLinkedBank({ data: { id: b.id }}); refetchBanks(); }}}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
               <div className="flex justify-between mt-6">
                 <Button variant="ghost" onClick={() => setStep("method")}><ChevronLeft className="h-4 w-4 mr-1" /> Back</Button>
-                <Button onClick={() => setStep("amount")} disabled={!bankId} className="gradient-primary glow-primary text-primary-foreground">Continue <ChevronRight className="h-4 w-4 ml-1" /></Button>
+                  <Button onClick={() => setStep("amount")} disabled={method === "wallet" ? !walletRecipient : !bankId} className="gradient-primary glow-primary text-primary-foreground">Continue <ChevronRight className="h-4 w-4 ml-1" /></Button>
               </div>
             </GlassCard>
           </motion.div>
