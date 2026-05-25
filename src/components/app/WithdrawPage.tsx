@@ -443,6 +443,13 @@ export function WithdrawPage() {
                     <Row label="To" value="M-Pesa" />
                     <Row label="Phone" value={mpesaPhone} />
                   </>
+                ) : method === "wallet" ? (
+                  <>
+                    <Row label="To" value={walletRecipient?.fullName ?? "Wallet"} />
+                    <Row label="Wallet" value={recipientWalletNumber} />
+                    <Row label="Phone" value={walletRecipient?.phone ?? "—"} />
+                    <Row label="Recipient currency" value={walletRecipient?.currency ?? ""} />
+                  </>
                 ) : (
                   <>
                     <Row label="To" value={bank?.account_name ?? ""} />
@@ -454,6 +461,9 @@ export function WithdrawPage() {
                 <Row label="Amount" value={`${wallet?.currency} ${Number(amount).toLocaleString(undefined, {minimumFractionDigits:2})}`} bold />
                 <Row label="Fee" value={`${wallet?.currency} ${fee.toLocaleString(undefined, {minimumFractionDigits:2})}`} />
                 <Row label="Total" value={`${wallet?.currency} ${total.toLocaleString(undefined, {minimumFractionDigits:2})}`} bold />
+                {method === "wallet" && walletRecipient && walletRecipient.currency !== wallet?.currency && walletExchange && (
+                  <Row label="Recipient gets" value={`${walletRecipient.currency} ${walletExchange.destinationAmount.toLocaleString(undefined, {minimumFractionDigits:2})}`} bold />
+                )}
               </div>
               <div className="space-y-2">
                 <Label className="text-xs uppercase tracking-wider text-muted-foreground flex items-center gap-1.5"><Lock className="h-3 w-3" /> Transaction PIN</Label>
