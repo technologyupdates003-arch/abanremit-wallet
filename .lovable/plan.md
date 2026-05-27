@@ -1,90 +1,87 @@
-# Continue Transaction Engine + Begin Super Admin Control Center
+# Static SPA + Edge Functions migration
 
-## Part A — Finish Transaction Engine (this turn)
+## Goal
+- Frontend builds to a folder of static `.html` / `.js` / `.css` files you upload to `public_html` on cPanel.
+- All backend logic (Daraja M-Pesa, transfers, PIN, SMS, Paystack, webhooks) moves to Supabase Edge Functions, called from the browser via `supabase.functions.invoke(...)`.
+- Webhooks (Paystack, Daraja STK + B2C) keep working — they get new permanent Supabase URLs you paste into the dashboards.
 
-1. **Convert page** (`src/routes/_app/convert.tsx` + `src/components/app/ConvertPage.tsx`)
-   - Source/destination wallet selectors (own wallets only, different currencies)
-   - Live rate preview via `getExchangeRate` server fn (debounced)
-   - Amount input with destination preview (`amount × effective_rate`)
-   - PIN step → calls `convertCurrency` with idempotency key
-   - Success receipt with rate, source/destination amounts, reference
-   - Realtime balance refresh on success
+## What changes architecturally
 
-2. **Realtime wallet hook** (`src/hooks/useWalletRealtime.ts`)
-   - Subscribes to `wallets`, `transactions`, `wallet_ledger` postgres_changes for current user
-   - Invalidates relevant React Query keys
-   - Mount once at app shell (`_app` layout) so all pages get live updates
-   - Enable realtime on `wallets`, `transactions`, `wallet_ledger`, `notifications` via migration
+```text
+BEFORE (TanStack Start, SSR)              AFTER (Vite SPA + Edge Functions)
+─────────────────────────────────         ─────────────────────────────────────
+Browser ──▶ TanStack Server ──▶ DB        Browser ──▶ Supabase Edge Fn ──▶ DB
+        (createServerFn)                          (supabase.functions.invoke)
 
-3. **Webhook refactor** (`src/routes/api/public/paystack-webhook.ts`)
-   - For `charge.success`: write a `transactions` row (type=`card_funding`, status=`successful`) alongside existing `credit_wallet_from_payment` flow
-   - For `transfer.success/failed/reversed`: also insert `transaction_status_history` row tied to the withdrawal's transaction (create `transactions` row when withdrawal is initiated if not already)
-   - Keep existing `finalize_withdrawal` / `reverse_withdrawal` calls (already atomic)
-   - Idempotent on `withdrawal_webhooks` table
+Webhook ──▶ /api/public/* (TS server)      Webhook ──▶ supabase/functions/* URL
+```
 
-4. **Send page polish**: add link to Convert when currency mismatch detected (already wired to error — turn it into a CTA).
+## Migration steps
 
-## Part B — Super Admin Control Center (foundation, this turn)
+### 1. Migrate server functions → edge functions
+Create these edge functions under `supabase/functions/`:
+- `daraja-stk-push` ← `src/lib/daraja.functions.ts` (initiateStkPush)
+- `daraja-b2c-withdraw` ← `src/lib/daraja.functions.ts` (initiateB2C)
+- `paystack-init` ← `src/lib/paystack.functions.ts`
+- `wallet-transfer` ← `src/lib/transactions.functions.ts` (executeTransfer + SMS)
+- `wallet-pin-set` ← `src/lib/transfers.functions.ts` (setTransactionPin)
+- `sms-send` ← `src/lib/sms.functions.ts` (admin SMS broadcasts)
+- `admin-actions` ← `src/lib/admin.functions.ts`
 
-Scope realistically: deliver a production-grade **foundation** with the highest-value modules wired end-to-end. Defer leaf modules (AbanCoin market controls, IntaSend, support desk, system settings UI) to follow-ups — they get DB-ready scaffolding only.
+Webhooks become edge functions with `verify_jwt = false`:
+- `daraja-stk-callback`, `daraja-b2c-result`, `daraja-b2c-timeout`, `paystack-webhook`
 
-### B1. RBAC + admin guard (migration)
-- Extend `app_role` enum: add `super_admin`, `finance_admin`, `support_admin`, `compliance_admin`, `fraud_admin`, `operations_admin`
-- New helper RPC `is_admin(uid)` → true for any non-`user` role
-- New helper RPC `has_admin_role(uid, role)` for granular checks
-- New `admin_audit_logs` table (admin_id, action, entity, entity_id, metadata, ip, user_agent, created_at) — RLS: admins read, inserts via SECURITY DEFINER only
-- New TanStack server middleware `requireAdmin` (reuses `requireSupabaseAuth`, then checks `is_admin`)
-- Route guard `_admin/route.tsx` → `beforeLoad` calls a `getAdminContext` server fn, redirects to `/` if not admin
-- First admin bootstrap: SQL function `bootstrap_first_admin(email)` callable once; document for the user
+Each edge function reuses the existing secrets (DARAJA_*, PAYSTACK_*, TALKSASA_*, etc.) — nothing new to add.
 
-### B2. Admin server functions (`src/lib/admin.functions.ts`)
-All `.middleware([requireAdmin])`, all log to `admin_audit_logs`:
-- `adminListUsers({ search, page, kyc_status, status })` — paginated profiles + roles + wallet totals
-- `adminGetUser(userId)` — full profile, wallets, devices, recent tx, kyc docs (signed URLs), pin_attempts, audit
-- `adminFreezeWallet(walletId, reason)` / `adminUnfreezeWallet(walletId)` — sets `wallets.status`
-- `adminAdjustBalance(walletId, amount, direction, reason)` — atomic via new RPC `tx_admin_adjust` (creates `transactions` row type=`admin_adjustment`, ledger entry, audit log)
-- `adminApproveKyc(userId, tier)` / `adminRejectKyc(userId, reason)` — updates profile + kyc_documents
-- `adminListTransactions({ filters, cursor })` — server-side pagination with all filters from prompt
-- `adminListWithdrawals({ status })` / `adminApproveWithdrawal(id)` / `adminRejectWithdrawal(id, reason)` — calls existing `reverse_withdrawal` for rejects
-- `adminSetExchangeRate(from, to, rate, spread)` — upsert into `exchange_rates`
-- `adminReplayWebhook(webhookId)` — re-runs webhook handler logic for stuck rows
-- `adminDashboardStats()` — single fn returning all KPI counters
+### 2. Rewrite frontend callers
+Replace every `useServerFn(xxx)` + `import from '@/lib/*.functions'` with:
+```ts
+const { data, error } = await supabase.functions.invoke('daraja-stk-push', { body: {...} });
+```
+Files touched: `FundWalletPage.tsx`, `WithdrawPage.tsx`, `SendMoneyPage.tsx`, `SettingsPage.tsx`, admin pages.
 
-### B3. Admin UI shell (`src/routes/_app/admin/`)
-Coal-black + matte-glass + red-accent theme (introduce `--admin-bg`, `--admin-surface`, `--admin-accent` tokens scoped under `[data-theme="admin"]` so it doesn't bleed into the rest of the app).
-- `admin/index.tsx` — Dashboard (KPI grid, live tx ticker via realtime, gateway health pings, revenue chart placeholder backed by real `transactions` aggregates)
-- `admin/users.tsx` — searchable, paginated table; row → drawer with full user profile, action buttons (freeze, unfreeze, approve KYC, reset PIN)
-- `admin/transactions.tsx` — full filter bar, virtualized table, row → drawer with ledger entries + status history + reversal action (where allowed)
-- `admin/withdrawals.tsx` — operational queue grouped by status, approve/reject/retry actions
-- `admin/kyc.tsx` — review queue with document viewer (zoomable), approve/reject with notes
-- `admin/wallets.tsx` — search/freeze/adjust UI, with mandatory reason + confirmation modal for adjustments
-- `admin/rates.tsx` — exchange-rate editor with spread, last-updated, history
-- `admin/audit.tsx` — admin audit log viewer (filterable by admin, action, entity, date)
-- `admin/security.tsx` — login attempts, pin lockouts, session revocation (defers external IP block to backlog)
-- Sidebar nav with role-gated items (use `has_admin_role` checks)
-- Realtime: subscribe to `transactions`, `withdrawals`, `kyc_documents` for live counters
+### 3. Convert framework: TanStack Start → Vite SPA
+- Replace `vite.config.ts` with a plain Vite + `@vitejs/plugin-react` config (drop `@lovable.dev/vite-tanstack-config`, `tanstackStart`, Cloudflare plugin).
+- Swap router: keep file-based routes but use `@tanstack/react-router` standalone (no `@tanstack/react-start`). Generate routeTree via `@tanstack/router-plugin`.
+- Delete: `src/server.ts`, `src/start.ts`, `src/lib/error-capture.ts`, `src/lib/error-page.ts`, `src/integrations/supabase/client.server.ts`, `src/integrations/supabase/auth-middleware.ts`, `src/integrations/supabase/auth-attacher.ts`, `src/integrations/supabase/admin-middleware.ts`, all `src/lib/*.functions.ts`, all `src/routes/api/public/*`, `wrangler.jsonc`, `supabase/config.toml` per-function blocks.
+- Update `src/router.tsx` + `src/routes/__root.tsx` for SPA mode (no `shellComponent`, regular `<html>` from `index.html`).
+- Add `index.html` at project root (Vite SPA entry).
+- Update root route: convert any loaders calling server fns to `useQuery` in components.
 
-### B4. Realtime publication
-- Single migration adding `wallets`, `transactions`, `wallet_ledger`, `notifications`, `withdrawals`, `kyc_documents`, `audit_logs` to `supabase_realtime` publication
+### 4. cPanel deploy artifacts
+- `package.json` build script outputs to `dist/`.
+- Create `dist/.htaccess` template (auto-copied on build) so SPA routes resolve:
+  ```apache
+  RewriteEngine On
+  RewriteBase /
+  RewriteRule ^index\.html$ - [L]
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule . /index.html [L]
+  ```
+- Add a short `DEPLOY-CPANEL.md` with: run `bun run build`, zip the `dist/` folder, upload to `public_html`, extract.
 
-### B5. Deferred (scaffolded, not built this turn)
-- AbanCoin market control UI (engine logs already exist, build read-only viewer only)
-- IntaSend control center (no IntaSend integration in project yet)
-- Support desk (no tickets schema yet — defer table + UI)
-- System settings UI (DB row exists conceptually only — defer)
-- Per-permission ACL beyond role-level checks
+### 5. Webhook URL updates (you do this in dashboards)
+After deploy, paste the new Supabase Edge Function URLs into:
+- Paystack dashboard → Webhook URL
+- Safaricom Daraja portal → STK callback URL, B2C result/timeout URLs
 
-## Technical notes
+I'll print the exact URLs at the end.
 
-- All admin mutations go through `SECURITY DEFINER` RPCs that re-verify `is_admin(auth.uid())` server-side — RLS is the backstop, middleware is the gate.
-- `tx_admin_adjust` follows the same atomic pattern as `tx_execute_transfer`: lock wallet `FOR UPDATE`, write `transactions` row, write `wallet_ledger` entry, write `transaction_status_history`, write `admin_audit_logs`.
-- Ledger remains immutable — adjustments create new entries, never UPDATE/DELETE.
-- Admin theme uses scoped CSS variables; existing user-facing theme stays untouched.
-- RBAC checks happen in three layers: route `beforeLoad` (UX), server fn middleware (auth), Postgres RPC (data).
+## Things that WILL break temporarily
+- Live preview in Lovable will still work (it'll just be SPA-mode now, no SSR).
+- The very first deploy needs webhook URLs updated in Paystack + Daraja before payments resume.
+- SEO/SSR is gone — every page renders client-side. Acceptable for an authenticated app like this.
 
-## Out of scope this turn (will state in reply)
-- Email/SMS alert delivery (DB notifications only)
-- AML/sanctions list integration
-- Automated fraud-rule engine (manual review queue only)
-- Bulk CSV exports (defer)
-- Per-role granular permission matrix UI (role-level only)
+## Things that stay the same
+- Supabase database, RLS, auth flows
+- All existing UI / pages / styles
+- Lovable Cloud secrets
+- TalkSasa SMS (just called from edge functions now)
+- M-Pesa & Paystack money flows (just routed through edge functions)
+
+## Scope
+This is roughly 7 new edge functions + 4 webhook edge functions + framework swap + ~8 component rewrites + build config. Substantial but mechanical. I'll do it in one go.
+
+## Confirm to proceed
+Reply "go" (or any confirmation) and I'll start with the edge functions, then the framework swap, then the component rewrites in that order.
