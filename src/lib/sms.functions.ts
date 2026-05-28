@@ -1,17 +1,9 @@
-import { createServerFn } from "@tanstack/react-start";
-import { z } from "zod";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { sendSms, welcomeMsg } from "./talksasa.server";
+import { invokeFn } from "./invoke-fn";
 
-const WelcomeInput = z.object({
-  phone: z.string().min(7).max(20),
-  fullName: z.string().max(80).optional(),
-});
-
-export const sendWelcomeSms = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((d: z.input<typeof WelcomeInput>) => WelcomeInput.parse(d))
-  .handler(async ({ data }) => {
-    const res = await sendSms(data.phone, welcomeMsg(data.fullName));
-    return res;
+export const sendWelcomeSms = async (opts: {
+  data: { phone: string; fullName?: string };
+}) =>
+  invokeFn<{ ok: boolean; error?: string }>("sms", {
+    action: "welcome",
+    ...opts.data,
   });
