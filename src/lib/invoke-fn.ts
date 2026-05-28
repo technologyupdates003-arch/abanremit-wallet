@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
  * Used by the *.functions.ts thin client wrappers so component code keeps the
  * same async-throw contract it had under TanStack server functions.
  */
-export async function invokeFn<T = unknown>(name: string, body: unknown): Promise<T> {
+export async function invokeFn<T = unknown>(name: string, body: Record<string, unknown>): Promise<T> {
   const { data, error } = await supabase.functions.invoke(name, { body });
   if (error) {
     let msg = error.message || "Request failed";
