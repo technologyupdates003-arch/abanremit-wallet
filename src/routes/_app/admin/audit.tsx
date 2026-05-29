@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useServerFn } from "@tanstack/react-start";
+import { useServerFn } from "@/lib/use-server-fn";
 import { adminListAudits } from "@/lib/admin.functions";
 
 export const Route = createFileRoute("/_app/admin/audit")({ component: AuditPage });

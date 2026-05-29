@@ -27,7 +27,6 @@ import { Route as AppDashboardRouteImport } from './routes/_app/dashboard'
 import { Route as AppAdminRouteImport } from './routes/_app/admin'
 import { Route as AppAbanRouteImport } from './routes/_app/aban'
 import { Route as AppAdminIndexRouteImport } from './routes/_app/admin/index'
-import { Route as ApiPublicIntasendWebhookRouteImport } from './routes/api/public/intasend-webhook'
 import { Route as AppAdminWithdrawalsRouteImport } from './routes/_app/admin/withdrawals'
 import { Route as AppAdminWalletsRouteImport } from './routes/_app/admin/wallets'
 import { Route as AppAdminUsersRouteImport } from './routes/_app/admin/users'
@@ -126,12 +125,6 @@ const AppAdminIndexRoute = AppAdminIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AppAdminRoute,
 } as any)
-const ApiPublicIntasendWebhookRoute =
-  ApiPublicIntasendWebhookRouteImport.update({
-    id: '/api/public/intasend-webhook',
-    path: '/api/public/intasend-webhook',
-    getParentRoute: () => rootRouteImport,
-  } as any)
 const AppAdminWithdrawalsRoute = AppAdminWithdrawalsRouteImport.update({
   id: '/withdrawals',
   path: '/withdrawals',
@@ -198,7 +191,6 @@ export interface FileRoutesByFullPath {
   '/admin/users': typeof AppAdminUsersRoute
   '/admin/wallets': typeof AppAdminWalletsRoute
   '/admin/withdrawals': typeof AppAdminWithdrawalsRoute
-  '/api/public/intasend-webhook': typeof ApiPublicIntasendWebhookRoute
   '/admin/': typeof AppAdminIndexRoute
 }
 export interface FileRoutesByTo {
@@ -225,7 +217,6 @@ export interface FileRoutesByTo {
   '/admin/users': typeof AppAdminUsersRoute
   '/admin/wallets': typeof AppAdminWalletsRoute
   '/admin/withdrawals': typeof AppAdminWithdrawalsRoute
-  '/api/public/intasend-webhook': typeof ApiPublicIntasendWebhookRoute
   '/admin': typeof AppAdminIndexRoute
 }
 export interface FileRoutesById {
@@ -255,7 +246,6 @@ export interface FileRoutesById {
   '/_app/admin/users': typeof AppAdminUsersRoute
   '/_app/admin/wallets': typeof AppAdminWalletsRoute
   '/_app/admin/withdrawals': typeof AppAdminWithdrawalsRoute
-  '/api/public/intasend-webhook': typeof ApiPublicIntasendWebhookRoute
   '/_app/admin/': typeof AppAdminIndexRoute
 }
 export interface FileRouteTypes {
@@ -285,7 +275,6 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/admin/wallets'
     | '/admin/withdrawals'
-    | '/api/public/intasend-webhook'
     | '/admin/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -312,7 +301,6 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/admin/wallets'
     | '/admin/withdrawals'
-    | '/api/public/intasend-webhook'
     | '/admin'
   id:
     | '__root__'
@@ -341,7 +329,6 @@ export interface FileRouteTypes {
     | '/_app/admin/users'
     | '/_app/admin/wallets'
     | '/_app/admin/withdrawals'
-    | '/api/public/intasend-webhook'
     | '/_app/admin/'
   fileRoutesById: FileRoutesById
 }
@@ -351,7 +338,6 @@ export interface RootRouteChildren {
   ForgotPasswordRoute: typeof ForgotPasswordRoute
   RegisterRoute: typeof RegisterRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
-  ApiPublicIntasendWebhookRoute: typeof ApiPublicIntasendWebhookRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -482,13 +468,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAdminIndexRouteImport
       parentRoute: typeof AppAdminRoute
     }
-    '/api/public/intasend-webhook': {
-      id: '/api/public/intasend-webhook'
-      path: '/api/public/intasend-webhook'
-      fullPath: '/api/public/intasend-webhook'
-      preLoaderRoute: typeof ApiPublicIntasendWebhookRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/_app/admin/withdrawals': {
       id: '/_app/admin/withdrawals'
       path: '/withdrawals'
@@ -616,18 +595,7 @@ const rootRouteChildren: RootRouteChildren = {
   ForgotPasswordRoute: ForgotPasswordRoute,
   RegisterRoute: RegisterRoute,
   ResetPasswordRoute: ResetPasswordRoute,
-  ApiPublicIntasendWebhookRoute: ApiPublicIntasendWebhookRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

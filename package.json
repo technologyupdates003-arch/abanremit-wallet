@@ -7,7 +7,9 @@
     "dev": "vite dev",
     "build": "vite build",
     "build:dev": "vite build --mode development",
+    "build:static": "vite build --config vite.static.config.ts",
     "preview": "vite preview",
+    "preview:static": "vite preview --config vite.static.config.ts --outDir dist-static",
     "lint": "eslint .",
     "format": "prettier --write ."
   },

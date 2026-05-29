@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useServerFn } from "@tanstack/react-start";
+import { useServerFn } from "@/lib/use-server-fn";
 import { adminListUsers, adminGetUser, adminAdjustBalance, adminSetWalletStatus } from "@/lib/admin.functions";
 import { toast } from "sonner";
 

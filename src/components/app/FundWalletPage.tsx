@@ -8,7 +8,7 @@ import { useAuth } from "@/lib/auth-context";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
-import { useServerFn } from "@tanstack/react-start";
+import { useServerFn } from "@/lib/use-server-fn";
 import { QRCodeSVG } from "qrcode.react";
 import { PaystackCardForm } from "./PaystackCardForm";
 import { darajaStkPush } from "@/lib/daraja.functions";
