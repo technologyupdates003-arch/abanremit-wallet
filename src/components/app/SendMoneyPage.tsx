@@ -10,7 +10,7 @@ import { useAuth } from "@/lib/auth-context";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useServerFn } from "@tanstack/react-start";
+import { useServerFn } from "@/lib/use-server-fn";
 import { lookupWallet, transferToWallet } from "@/lib/transactions.functions";
 import { darajaB2CSend } from "@/lib/daraja.functions";
 
