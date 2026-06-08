@@ -14,9 +14,12 @@ import { tanstackRouter } from "@tanstack/router-plugin/vite";
 import path from "node:path";
 
 export default defineConfig({
-  // Relative base so the bundle works whether the user uploads to public_html
-  // root or to a subfolder like public_html/app/.
-  base: "./",
+  // MUST be absolute "/" for SPA deep-link refreshes to work with the
+  // Apache SPA fallback in public/.htaccess. With "./" a refresh on /auth
+  // resolves ./assets/*.js against /auth/, gets rewritten to index.html,
+  // and the browser silently loads HTML in place of JS → frozen UI.
+  // If you deploy to a subfolder, set this to "/subfolder/" instead.
+  base: "/",
   plugins: [
     tanstackRouter({
       target: "react",
