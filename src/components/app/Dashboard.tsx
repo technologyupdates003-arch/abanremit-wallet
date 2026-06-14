@@ -42,16 +42,11 @@ export function Dashboard() {
     const seed = totalUsd || 1000;
     return Array.from({ length: 30 }, (_, i) => ({
       d: i,
-      v: seed * (0.85 + Math.sin(i / 3) * 0.07 + Math.random() * 0.05),
+      v: seed * (0.88 + Math.sin(i / 3) * 0.07 + Math.cos(i / 5) * 0.03),
     }));
   }, [totalUsd]);
 
-  const greeting = (() => {
-    const h = new Date().getHours();
-    if (h < 12) return "Good morning";
-    if (h < 18) return "Good afternoon";
-    return "Good evening";
-  })();
+  const greeting = "Welcome back";
   const name = (user?.user_metadata?.full_name as string | undefined)?.split(" ")[0] ?? "there";
 
   return (
