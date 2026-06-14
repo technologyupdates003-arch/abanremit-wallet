@@ -42,3 +42,27 @@ export async function getAccessToken(): Promise<string> {
 export function b64(text: string): string {
   return encodeBase64(new TextEncoder().encode(text));
 }
+
+/**
+ * Build the Daraja SecurityCredential at runtime by RSA-PKCS1-encrypting the
+ * raw initiator password with Safaricom's public certificate. Falls back to
+ * the pre-baked DARAJA_B2C_SECURITY_CREDENTIAL only if no password is set.
+ *
+ * This avoids stale-credential errors ("The initiator information is invalid")
+ * whenever the API user's password is rotated on the Daraja portal.
+ */
+export function buildSecurityCredential(): string {
+  const password = Deno.env.get("DARAJA_B2C_INTIATOR_PASSWORD")
+    ?? Deno.env.get("DARAJA_B2C_INITIATOR_PASSWORD");
+  if (password && password.trim()) {
+    const encrypted = publicEncrypt(
+      { key: darajaCert(), padding: cryptoConstants.RSA_PKCS1_PADDING },
+      new TextEncoder().encode(password.trim()),
+    );
+    return encodeBase64(encrypted);
+  }
+  const baked = Deno.env.get("DARAJA_B2C_SECURITY_CREDENTIAL");
+  if (!baked) throw new Error("Daraja initiator password / credential not configured");
+  return baked;
+}
+
