@@ -76,10 +76,10 @@ async function stkPush(body: { phone: string; amount: number }, ctx: Awaited<Ret
 async function b2cSend(body: { phone: string; amount: number; walletId?: string; pin: string; narration?: string; commandID?: string }, ctx: Awaited<ReturnType<typeof requireAuth>>) {
   const shortcode = Deno.env.get("DARAJA_B2C_SHORTCODE");
   const initiator = Deno.env.get("DARAJA_B2C_INITIATOR_NAME") ?? Deno.env.get("DARAJA_B2C_INTIATOR_NAME");
-  const credential = Deno.env.get("DARAJA_B2C_SECURITY_CREDENTIAL");
   const resultUrl = Deno.env.get("DARAJA_B2C_RESULT_URL") ?? `${SB_FN_BASE}/mpesa-b2c-result`;
   const timeoutUrl = Deno.env.get("DARAJA_B2C_TIMEOUT_URL") ?? `${SB_FN_BASE}/mpesa-b2c-timeout`;
-  if (!shortcode || !initiator || !credential) throw new Error("Daraja B2C configuration incomplete");
+  if (!shortcode || !initiator) throw new Error("Daraja B2C configuration incomplete");
+  const credential = buildSecurityCredential();
 
   const { error: pinErr } = await ctx.supabase.rpc("verify_transaction_pin", { _pin: body.pin });
   if (pinErr) throw new Error(pinErr.message);
