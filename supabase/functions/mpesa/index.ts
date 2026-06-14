@@ -3,7 +3,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { corsHeaders, jsonResponse } from "../_shared/cors.ts";
 import { requireAuth } from "../_shared/auth.ts";
-import { b64, darajaBase, darajaTimestamp, getAccessToken, normalizePhone } from "../_shared/daraja.ts";
+import { b64, buildSecurityCredential, darajaBase, darajaTimestamp, getAccessToken, normalizePhone } from "../_shared/daraja.ts";
 
 const APP_ORIGIN = Deno.env.get("APP_URL") ?? "https://aban-nova-nexus.lovable.app";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
