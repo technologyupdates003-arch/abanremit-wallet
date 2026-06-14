@@ -1,6 +1,6 @@
-import { encodeBase64, decodeBase64 } from "https://deno.land/std@0.224.0/encoding/base64.ts";
+import { encodeBase64 } from "https://deno.land/std@0.224.0/encoding/base64.ts";
 import { publicEncrypt, constants as cryptoConstants } from "node:crypto";
-import { darajaCert } from "./daraja-cert.ts";
+import { darajaPublicKey } from "./daraja-cert.ts";
 
 export function normalizePhone(p: string): string {
   const d = (p ?? "").replace(/\D/g, "");
@@ -45,7 +45,7 @@ export function b64(text: string): string {
 
 /**
  * Build the Daraja SecurityCredential at runtime by RSA-PKCS1-encrypting the
- * raw initiator password with Safaricom's public certificate. Falls back to
+ * raw initiator password with Safaricom's public key. Falls back to
  * the pre-baked DARAJA_B2C_SECURITY_CREDENTIAL only if no password is set.
  *
  * This avoids stale-credential errors ("The initiator information is invalid")
@@ -56,7 +56,7 @@ export function buildSecurityCredential(): string {
     ?? Deno.env.get("DARAJA_B2C_INITIATOR_PASSWORD");
   if (password && password.trim()) {
     const encrypted = publicEncrypt(
-      { key: darajaCert(), padding: cryptoConstants.RSA_PKCS1_PADDING },
+      { key: darajaPublicKey(), padding: cryptoConstants.RSA_PKCS1_PADDING },
       new TextEncoder().encode(password.trim()),
     );
     return encodeBase64(encrypted);
