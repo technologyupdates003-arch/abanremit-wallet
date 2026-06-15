@@ -1,6 +1,6 @@
 # cPanel / Apache fallback for the static AbanRemit build.
-# The cPanel package uses relative assets and hash routing so it works from
-# public_html/ or from an extracted subfolder.
+# The app uses hash routing in the cPanel package so it works from public_html/
+# or from an extracted subfolder without broken asset paths.
 
 <IfModule mod_rewrite.c>
   RewriteEngine On
