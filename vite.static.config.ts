@@ -14,12 +14,11 @@ import { tanstackRouter } from "@tanstack/router-plugin/vite";
 import path from "node:path";
 
 export default defineConfig({
-  // MUST be absolute "/" for SPA deep-link refreshes to work with the
-  // Apache SPA fallback in public/.htaccess. With "./" a refresh on /auth
-  // resolves ./assets/*.js against /auth/, gets rewritten to index.html,
-  // and the browser silently loads HTML in place of JS → frozen UI.
-  // If you deploy to a subfolder, set this to "/subfolder/" instead.
-  base: "/",
+  // Relative assets keep the cPanel zip working whether the user uploads the
+  // files into public_html/ or extracts them into a subfolder. Routing is
+  // handled by hash history in src/main.tsx, so deep-link refreshes no longer
+  // turn JS chunk requests into index.html on Apache.
+  base: "./",
   plugins: [
     tanstackRouter({
       target: "react",
