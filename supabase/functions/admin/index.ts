@@ -1,8 +1,9 @@
 // Admin edge function: dashboard, users, wallet ops, KYC, transactions,
-// withdrawals, exchange rates, audits, security, webhook replay.
+// withdrawals, exchange rates, audits, security, webhook replay, admin B2C payout.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { corsHeaders, jsonResponse } from "../_shared/cors.ts";
 import { requireAdmin, AuthCtx } from "../_shared/auth.ts";
+import { buildSecurityCredential, darajaBase, getAccessToken, normalizePhone } from "../_shared/daraja.ts";
 
 function ip(req: Request) { return req.headers.get("x-forwarded-for") ?? null; }
 function ua(req: Request) { return req.headers.get("user-agent") ?? null; }
