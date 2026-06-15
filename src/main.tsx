@@ -5,13 +5,15 @@ import "./styles.css";
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { RouterProvider, createRouter } from "@tanstack/react-router";
+import { RouterProvider, createHashHistory, createRouter } from "@tanstack/react-router";
 import { routeTree } from "./routeTree.gen";
 
 const queryClient = new QueryClient();
+const hashHistory = createHashHistory();
 
 const router = createRouter({
   routeTree,
+  history: hashHistory,
   context: { queryClient },
   defaultPreload: "intent",
   defaultPreloadStaleTime: 0,
