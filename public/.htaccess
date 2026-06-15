@@ -1,6 +1,6 @@
-# cPanel / Apache SPA fallback for the static AbanRemit build.
-# Ensures deep links like /dashboard, /admin/kyc, /reset-password resolve to
-# index.html so the client router can take over.
+# cPanel / Apache fallback for the static AbanRemit build.
+# The app uses hash routing in the cPanel package so it works from public_html/
+# or from an extracted subfolder without broken asset paths.
 
 <IfModule mod_rewrite.c>
   RewriteEngine On
@@ -15,8 +15,13 @@
   RewriteRule ^ index.html [L]
 </IfModule>
 
-# Long-cache hashed assets, no-cache HTML.
+# Long-cache hashed assets, but never cache HTML or service-worker cleanup files.
 <IfModule mod_headers.c>
+  <FilesMatch "^(index\.html|sw\.js|service-worker\.js|manifest\.json|manifest\.webmanifest)$">
+    Header set Cache-Control "no-cache, no-store, must-revalidate"
+    Header set Pragma "no-cache"
+    Header set Expires "0"
+  </FilesMatch>
   <FilesMatch "\.(js|css|woff2?|ttf|otf|eot|png|jpg|jpeg|gif|svg|webp|avif|ico)$">
     Header set Cache-Control "public, max-age=31536000, immutable"
   </FilesMatch>
