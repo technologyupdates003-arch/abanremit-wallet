@@ -1,19 +1,26 @@
-// Kill-switch service worker. Unregisters any previously-installed SW and
-// clears all caches so stale shells (mismatched asset hashes) cannot freeze
-// the app. This restores normal network loading for every client.
+// Kill-switch service worker for one cleanup release.
+// It evicts old Workbox/app-shell caches and then unregisters itself so stale
+// cached HTML cannot keep showing a frozen, non-interactive login screen.
+function isWorkboxCacheForThisRegistration(name) {
+  const hasWorkboxBucket = /(^|-)precache-v\d+-|(^|-)runtime-|(^|-)googleAnalytics-/.test(name);
+  return hasWorkboxBucket && name.endsWith(self.registration.scope);
+}
+
 self.addEventListener("install", () => self.skipWaiting());
-self.addEventListener("activate", (event) => {
+
+self.addEventListener("activate", (event) =>
   event.waitUntil(
     (async () => {
       try {
-        const keys = await caches.keys();
-        await Promise.all(keys.map((k) => caches.delete(k)));
-      } catch {}
-      try {
+        const cacheNames = await caches.keys();
+        const appCacheNames = cacheNames.filter(isWorkboxCacheForThisRegistration);
+        await Promise.allSettled(appCacheNames.map((name) => caches.delete(name)));
+        await self.clients.claim();
+        const clients = await self.clients.matchAll({ type: "window" });
+        await Promise.allSettled(clients.map((client) => client.navigate(client.url)));
+      } finally {
         await self.registration.unregister();
-      } catch {}
-      const clients = await self.clients.matchAll({ type: "window" });
-      clients.forEach((c) => c.navigate(c.url));
+      }
     })()
-  );
-});
+  ),
+);
