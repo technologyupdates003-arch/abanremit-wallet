@@ -24,10 +24,16 @@
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
     <script>
+      // Kill-switch: unregister any prior service worker and wipe its caches.
+      // A stale SW from a previous deploy was serving a mismatched HTML shell
+      // and preventing React from hydrating (login form looked like an image).
       if ("serviceWorker" in navigator) {
-        window.addEventListener("load", () => {
-          navigator.serviceWorker.register("/sw.js").catch(() => {});
-        });
+        navigator.serviceWorker.getRegistrations().then((regs) => {
+          regs.forEach((r) => r.unregister().catch(() => {}));
+        }).catch(() => {});
+        if (window.caches && caches.keys) {
+          caches.keys().then((keys) => keys.forEach((k) => caches.delete(k))).catch(() => {});
+        }
       }
     </script>
   </body>
