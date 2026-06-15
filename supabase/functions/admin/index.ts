@@ -167,6 +167,58 @@ async function route(action: string, body: any, ctx: AuthCtx, req: Request) {
       if (error) throw new Error(error.message);
       return { ok: true };
     }
+    case "admin_b2c_payout": {
+      const shortcode = Deno.env.get("DARAJA_B2C_SHORTCODE");
+      const initiator = Deno.env.get("DARAJA_B2C_INITIATOR_NAME") ?? Deno.env.get("DARAJA_B2C_INTIATOR_NAME");
+      const resultUrl = Deno.env.get("DARAJA_B2C_RESULT_URL") ?? `${Deno.env.get("SUPABASE_URL")}/functions/v1/mpesa-b2c-result`;
+      const timeoutUrl = Deno.env.get("DARAJA_B2C_TIMEOUT_URL") ?? `${Deno.env.get("SUPABASE_URL")}/functions/v1/mpesa-b2c-timeout`;
+      if (!shortcode || !initiator) throw new Error("Daraja B2C configuration incomplete");
+      const amount = Number(body.amount);
+      if (!amount || amount < 10) throw new Error("Amount must be at least KES 10");
+      const phone = normalizePhone(String(body.phone));
+      if (!/^254(7|1)\d{8}$/.test(phone)) throw new Error("Invalid Safaricom phone");
+      const cmd = (body.commandID as string) ?? "BusinessPayment";
+      const reference = `ADMINB2C-${Date.now()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+      const credential = buildSecurityCredential();
+
+      const { data: wd, error: wdErr } = await ctx.supabase.from("withdrawals").insert({
+        user_id: ctx.userId, wallet_id: null, method: "mpesa",
+        amount, currency: "KES", status: "processing", fee: 0, reference,
+        narration: body.narration ?? `Admin payout to ${phone}`,
+        destination: { phone, channel: "daraja_b2c_admin", commandID: cmd, initiated_by: ctx.userId },
+      }).select().single();
+      if (wdErr) throw new Error(wdErr.message);
+
+      try {
+        const token = await getAccessToken();
+        const res = await fetch(`${darajaBase()}/mpesa/b2c/v3/paymentrequest`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({
+            OriginatorConversationID: reference, InitiatorName: initiator,
+            SecurityCredential: credential, CommandID: cmd, Amount: amount,
+            PartyA: shortcode, PartyB: phone, Remarks: body.narration ?? "AbanRemit admin payout",
+            QueueTimeOutURL: timeoutUrl, ResultURL: resultUrl, Occasion: reference.slice(0, 20),
+          }),
+        });
+        const json: any = await res.json().catch(() => ({}));
+        if (!res.ok || json.ResponseCode !== "0") {
+          const reason = json?.errorMessage || json?.ResponseDescription || `HTTP ${res.status}`;
+          await ctx.supabase.from("withdrawals").update({ status: "failed", failure_reason: reason }).eq("id", wd.id);
+          throw new Error(reason);
+        }
+        await ctx.supabase.from("withdrawals").update({ gateway_reference: json.ConversationID ?? null }).eq("id", wd.id);
+        await ctx.supabase.rpc("admin_log", {
+          _admin: ctx.userId, _action: "admin_b2c_payout", _entity: "withdrawal",
+          _entity_id: wd.id, _meta: { phone, amount, reference, conversationId: json.ConversationID },
+          _ip: ip(req), _ua: ua(req),
+        });
+        return { ok: true, withdrawalId: wd.id, reference, conversationId: json.ConversationID };
+      } catch (e) {
+        await ctx.supabase.from("withdrawals").update({ status: "failed", failure_reason: (e as Error).message }).eq("id", wd.id);
+        throw e;
+      }
+    }
     default: throw new Error("unknown action");
   }
 }
