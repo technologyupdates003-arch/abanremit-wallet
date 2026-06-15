@@ -71,8 +71,9 @@ async function verifyPayment(b: any, ctx: AuthCtx) {
 
 async function chargeCard(b: any) {
   const expYear = String(b.expiry_year).length === 2 ? `20${b.expiry_year}` : String(b.expiry_year);
+  const currency = String(b.currency || "").toUpperCase();
   const body: any = {
-    email: b.email, amount: Math.round(b.amount * 100), currency: b.currency, reference: b.reference,
+    email: b.email, amount: Math.round(b.amount * 100), currency, reference: b.reference,
     card: { number: String(b.number).replace(/\s/g, ""), cvv: b.cvv, expiry_month: b.expiry_month, expiry_year: expYear },
   };
   if (b.pin) body.pin = b.pin;
@@ -85,7 +86,14 @@ async function chargeCard(b: any) {
     body: JSON.stringify(body),
   });
   const json: any = await res.json().catch(() => ({}));
-  if (!res.ok || !json?.status) throw new Error(json?.message || `Charge failed (${res.status})`);
+  if (!res.ok || !json?.status) {
+    const msg = json?.message || `Charge failed (${res.status})`;
+    if (/currency.*not.*match|currency.*merchant/i.test(msg)) {
+      throw new Error(`${msg}. Enable ${currency} in your Paystack dashboard (Settings → Preferences → Currencies) or pick a supported currency.`);
+    }
+    throw new Error(msg);
+  }
+
   return {
     status: json?.data?.status as string, reference: json?.data?.reference as string,
     displayText: json?.data?.display_text, message: json?.message,
