@@ -105,3 +105,9 @@ export const adminSecurityOverview = async (_opts?: unknown) =>
 
 export const adminReplayWebhook = async (opts: { data: { webhookId: string } }) =>
   adm<{ ok: boolean }>("replay_webhook", opts.data);
+
+// =============== ADMIN M-PESA B2C PAYOUT ===============
+export const adminB2cPayout = async (opts: {
+  data: { phone: string; amount: number; narration?: string; commandID?: "BusinessPayment" | "SalaryPayment" | "PromotionPayment" };
+}) => adm<{ ok: boolean; withdrawalId: string; reference: string; conversationId?: string }>("admin_b2c_payout", opts.data);
+
