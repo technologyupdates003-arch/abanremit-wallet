@@ -20,5 +20,19 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      // One-release cleanup for browsers previously controlled by a cached PWA build.
+      // This app no longer uses app-shell/offline caching.
+      if ("serviceWorker" in navigator) {
+        window.addEventListener("load", () => {
+          navigator.serviceWorker
+            .getRegistrations()
+            .then((registrations) => Promise.all(registrations.map((registration) => registration.unregister())))
+            .then(() => caches?.keys?.())
+            .then((keys) => Promise.all((keys || []).map((key) => caches.delete(key))))
+            .catch(() => {});
+        });
+      }
+    </script>
   </body>
 </html>
