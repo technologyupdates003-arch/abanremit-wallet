@@ -1,9 +1,5 @@
 // One-release cleanup worker for browsers still controlled by the old app-shell PWA.
-// It deletes only Workbox caches for this registration, refreshes open tabs, then unregisters itself.
-function isWorkboxCacheForThisRegistration(name) {
-  const hasWorkboxBucket = /(^|-)precache-v\d+-|(^|-)runtime-|(^|-)googleAnalytics-/.test(name);
-  return hasWorkboxBucket && name.endsWith(self.registration.scope);
-}
+// This project is now SPA-only, so purge all origin caches, refresh tabs, then unregister.
 
 self.addEventListener("install", () => self.skipWaiting());
 
@@ -12,8 +8,7 @@ self.addEventListener("activate", (event) =>
     (async () => {
       try {
         const cacheNames = await caches.keys();
-        const workboxCacheNames = cacheNames.filter(isWorkboxCacheForThisRegistration);
-        await Promise.allSettled(workboxCacheNames.map((name) => caches.delete(name)));
+        await Promise.allSettled(cacheNames.map((name) => caches.delete(name)));
         await self.clients.claim();
         const windowClients = await self.clients.matchAll({ type: "window" });
         await Promise.allSettled(windowClients.map((client) => client.navigate(client.url)));
